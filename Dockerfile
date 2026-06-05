@@ -1,73 +1,37 @@
-FROM php:8.2-cli
+FROM php:8.2-fpm
 
-# Directorio de trabajo
-WORKDIR /var/www
-
-# =========================================
-# 1. DEPENDENCIAS DEL SISTEMA
-# =========================================
+# Dependencias del sistema
 RUN apt-get update && apt-get install -y \
     git \
     curl \
-    unzip \
     zip \
+    unzip \
+    libpq-dev \
     libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libpq-dev
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    libzip-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_pgsql pgsql gd zip
 
-# =========================================
-# 2. NODE.JS (PARA VITE)
-# =========================================
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs
-
-# =========================================
-# 3. EXTENSIONES PHP
-# =========================================
-RUN docker-php-ext-install \
-    pdo \
-    pdo_pgsql \
-    mbstring \
-    exif \
-    pcntl \
-    bcmath \
-    gd
-
-# =========================================
-# 4. COMPOSER
-# =========================================
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# =========================================
-# 5. COPIAR PROYECTO
-# =========================================
+WORKDIR /var/www
+
+# Copiar proyecto
 COPY . .
 
-# =========================================
-# 6. DEPENDENCIAS BACKEND (LARAVEL)
-# =========================================
+# Instalar dependencias
 RUN composer install --no-dev --optimize-autoloader
 
-# =========================================
-# 7. DEPENDENCIAS FRONTEND (VITE)
-#    🔥 ORDEN CRÍTICO PARA QUE NO ROMPA CSS
-# =========================================
-RUN npm install
-RUN npm run build
-
-# =========================================
-# 8. PERMISOS LARAVEL
-# =========================================
+# Permisos Laravel
 RUN chmod -R 775 storage bootstrap/cache
 
-
-# =========================================
-# 10. PUERTO RENDER
-# =========================================
+# Puerto Render
 EXPOSE 10000
 
-# =========================================
-# 11. INICIAR SERVIDOR
-# =========================================
-CMD php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
+# Iniciar servidor Laravel
+CMD php artisan migrate --force && \
+    php artisan storage:link || true && \
+    php artisan serve --host=0.0.0.0 --port=10000

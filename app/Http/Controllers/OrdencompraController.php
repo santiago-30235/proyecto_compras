@@ -9,9 +9,19 @@ use App\Models\Proveedor;
 use App\Models\MetodoPago;
 use App\Models\Pago;
 use Illuminate\Http\Request;
+use PDF;
+use Excel;
+use App\Exports\OrdenCompraExport;
+use App\Exports\OrdenesComprasExport;
+use App\Exports\OrdenesExport;
 
 class OrdenCompraController extends Controller
 {
+    public function exportarExcel()
+    {
+        return Excel::download(new OrdenesExport(), 'ordenes-compras.xlsx');
+    }
+
     public function index()
     {
         $ordencompras = OrdenCompra::with('proveedor')->get();
@@ -46,24 +56,9 @@ class OrdenCompraController extends Controller
             if ($nuevoStock > $producto->stockmaximo) {
                 $disponible = $producto->stockmaximo - $producto->stock;
                 return redirect()->back()
-                    ->withErrors(["No se puede comprar {$item['cantidad']} unidades de '{$producto->nombre}'. Stock actual: {$producto->stock}, Máximo: {$producto->stockmaximo}. Solo puedes comprar hasta {$disponible} unidades."])
+                    ->withErrors(["No se puede comprar {$item['cantidad']} unidades de '{$producto->nombre}'. Solo puedes comprar hasta {$disponible} unidades."])
                     ->withInput();
             }
-        }
-
-        // Si es CONTADO, necesita método de pago
-        if ($request->tipopago == 'contado') {
-            // Si no viene método de pago, asigna el primero disponible
-            if (empty($request->metodopago_id)) {
-                $primerMetodo = MetodoPago::where('estado', '1')->first();
-                if ($primerMetodo) {
-                    $request->merge(['metodopago_id' => $primerMetodo->id]);
-                }
-            }
-            
-            $request->validate([
-                'metodopago_id' => 'required|exists:metodopagos,id',
-            ]);
         }
 
         $total = 0;
@@ -98,26 +93,53 @@ class OrdenCompraController extends Controller
             $producto->save();
         }
 
-        // Lógica según tipo de pago
+        // LÓGICA SEGÚN TIPO DE PAGO
         if ($request->tipopago == 'contado') {
+            // CONTADO: pago automático por el total
             Pago::create([
                 'ordencompra_id' => $orden->id,
                 'fechapago' => now(),
                 'monto' => $total,
-                'metodopago_id' => $request->metodopago_id,
+                'metodopago_id' => $request->metodopago_id ?? 1,
                 'registradopor' => auth()->user()->name,
             ]);
-            $orden->update([
-                'total' => $total,
-                'saldopendiente' => 0,
-            ]);
+            $orden->update(['total' => $total, 'saldopendiente' => 0]);
             $mensaje = 'Orden de compra creada y PAGADA exitosamente';
+            
         } else {
+            // CRÉDITO: con abono inicial
+            $abonoInicial = $request->abono_inicial ?? 0;
+            
+            if ($abonoInicial < 0) {
+                return back()->withErrors('El abono inicial no puede ser negativo')->withInput();
+            }
+            if ($abonoInicial > $total) {
+                return back()->withErrors('El abono inicial no puede ser mayor al total de la orden')->withInput();
+            }
+            
+            $nuevoSaldo = $total - $abonoInicial;
+            
             $orden->update([
                 'total' => $total,
-                'saldopendiente' => $total,
+                'saldopendiente' => $nuevoSaldo,
             ]);
-            $mensaje = 'Orden de compra creada. Saldo pendiente: $' . number_format($total, 2);
+            
+            // Si hay abono inicial, crear el pago
+            if ($abonoInicial > 0) {
+                Pago::create([
+                    'ordencompra_id' => $orden->id,
+                    'fechapago' => now(),
+                    'monto' => $abonoInicial,
+                    'metodopago_id' => $request->metodopago_id ?? 1,
+                    'registradopor' => auth()->user()->name,
+                ]);
+            }
+            
+            $mensaje = 'Orden de compra creada. ';
+            if ($abonoInicial > 0) {
+                $mensaje .= 'Abono inicial: $' . number_format($abonoInicial, 2) . '. ';
+            }
+            $mensaje .= 'Saldo pendiente: $' . number_format($nuevoSaldo, 2);
         }
 
         return redirect()->route('ordencompras.index')->with('successMsg', $mensaje);
@@ -185,5 +207,26 @@ class OrdenCompraController extends Controller
             $orden->save();
         }
         return response()->json(['success' => true]);
+    }
+
+    // PDF
+    public function generarPDF($id)
+    {
+        $orden = OrdenCompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
+        $data = ['orden' => $orden, 'fecha' => now()->format('d/m/Y H:i')];
+        $pdf = PDF::loadView('ordencompras.pdf', $data)->setPaper('a4', 'portrait');
+        return $pdf->stream('orden-compra-' . $orden->id . '.pdf');
+    }
+
+    // EXCEL
+    public function generarExcel($id)
+    {
+        $orden = OrdenCompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
+        return Excel::download(new OrdenCompraExport($orden), 'orden-compra-' . $id . '.xlsx');
+    }
+
+    public function generarExcelGeneral()
+    {
+        return Excel::download(new OrdenesComprasExport(), 'ordenes-compras.xlsx');
     }
 }

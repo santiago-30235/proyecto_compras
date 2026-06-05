@@ -29,9 +29,14 @@
                                     <i class="fas fa-file-invoice-dollar mr-2 text-primary"></i>
                                     @yield('title')
                                 </h3>
-                                <a href="{{ route('ordencompras.create') }}" class="btn btn-primary">
-                                    <i class="fas fa-plus mr-1"></i> Nueva Orden
-                                </a>
+                                <div>
+                                    <a href="{{ route('ordenes.exportar') }}" class="btn btn-success mr-2" title="Exportar todas las órdenes a Excel">
+                                        <i class="fas fa-file-excel mr-1"></i> Exportar Excel General
+                                    </a>
+                                    <a href="{{ route('ordencompras.create') }}" class="btn btn-primary">
+                                        <i class="fas fa-plus mr-1"></i> Nueva Orden
+                                    </a>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body">
@@ -54,7 +59,7 @@
                                     <tr>
                                         <td>#{{ $orden->id }}</td>
                                         <td>{{ $orden->proveedor->nombre ?? 'N/A' }}</td>
-                                        <td>{{ date('d/m/Y', strtotime($orden->fecha)) }}</td>
+                                        <td>{{ date('d/m/Y H:i', strtotime($orden->fecha)) }}</td>
                                         <td>${{ number_format($orden->total, 2) }}</td>
                                         <td>{{ ucfirst($orden->tipopago) }}</td>
                                         <td>
@@ -72,6 +77,9 @@
                                             <div class="btn-group btn-group-sm">
                                                 <a href="{{ route('ordencompras.show', $orden->id) }}" class="btn btn-info" title="Ver">
                                                     <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ route('ordencompras.pdf', $orden->id) }}" class="btn btn-danger" title="Generar PDF" target="_blank">
+                                                    <i class="fas fa-file-pdf"></i>
                                                 </a>
                                                 <a href="{{ route('ordencompras.edit', $orden->id) }}" class="btn btn-primary" title="Editar">
                                                     <i class="fas fa-pencil-alt"></i>

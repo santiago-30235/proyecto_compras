@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\ProductoController;
-use App\Http\Controllers\OrdencompraController;
+use App\Http\Controllers\OrdenCompraController;
 use App\Http\Controllers\DetalleCompraController;
 use App\Http\Controllers\MetodoPagoController;
 use App\Http\Controllers\PagoController;
@@ -56,31 +56,24 @@ Route::middleware(['auth'])->group(function () {
     // PROVEEDORES
     // =========================
     Route::resource('proveedores', ProveedorController::class);
-
-    Route::get('cambioestadoproveedor', [
-        ProveedorController::class,
-        'cambioestado'
-    ])->name('cambioestadoproveedor');
+    Route::get('cambioestadoproveedor', [ProveedorController::class, 'cambioestado'])->name('cambioestadoproveedor');
 
     // =========================
     // PRODUCTOS
     // =========================
     Route::resource('productos', ProductoController::class);
-
-    Route::get('cambioestadoproducto', [
-        ProductoController::class,
-        'cambioestado'
-    ])->name('cambioestadoproducto');
+    Route::get('cambioestadoproducto', [ProductoController::class, 'cambioestado'])->name('cambioestadoproducto');
 
     // =========================
     // ORDENES DE COMPRA
     // =========================
-    Route::resource('ordencompras', OrdencompraController::class);
-
-    Route::get('cambioestadoordencompra', [
-        OrdencompraController::class,
-        'cambioestado'
-    ])->name('cambioestadoordencompra');
+    Route::resource('ordencompras', OrdenCompraController::class);
+    Route::get('cambioestadoordencompra', [OrdenCompraController::class, 'cambioestado'])->name('cambioestadoordencompra');
+    
+    // PDF y EXCEL
+    Route::get('ordencompras/pdf/{id}', [OrdenCompraController::class, 'generarPDF'])->name('ordencompras.pdf');
+    Route::get('ordencompras/excel/{id}', [OrdenCompraController::class, 'generarExcel'])->name('ordencompras.excel');
+    Route::get('ordenes/exportar', [OrdenCompraController::class, 'exportarExcel'])->name('ordenes.exportar');
 
     // =========================
     // DETALLE COMPRAS
@@ -91,19 +84,11 @@ Route::middleware(['auth'])->group(function () {
     // METODOS DE PAGO
     // =========================
     Route::resource('metodopagos', MetodoPagoController::class);
-
-    Route::get('cambioestadometodopago', [
-        MetodoPagoController::class,
-        'cambioestado'
-    ])->name('cambioestadometodopago');
+    Route::get('cambioestadometodopago', [MetodoPagoController::class, 'cambioestado'])->name('cambioestadometodopago');
 
     // =========================
     // PAGOS
     // =========================
     Route::resource('pagos', PagoController::class);
-
-    Route::get('cambioestadopago', [
-        PagoController::class,
-        'cambioestado'
-    ])->name('cambioestadopago');
+    Route::get('cambioestadopago', [PagoController::class, 'cambioestado'])->name('cambioestadopago');
 });

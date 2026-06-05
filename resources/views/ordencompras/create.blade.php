@@ -3,278 +3,284 @@
 @section('title', 'Crear Orden de Compra')
 
 @section('content')
+<style>
+    .container-custom {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    .card-custom {
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .two-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 768px) {
+        .two-columns {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+</style>
 
-<div class="content-wrapper">
-
-    <section class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 style="font-weight: bold; color: #343a40;">Crear Orden de Compra</h1>
-                </div>
-                <div class="col-sm-6 text-right">
-                    <a href="{{ route('ordencompras.index') }}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left mr-1"></i> Volver
-                    </a>
-                </div>
-            </div>
+<div class="container-custom">
+    <div class="card card-custom">
+        <div class="card-header bg-secondary">
+            <h3>Crear Orden de Compra</h3>
         </div>
-    </section>
-
-    @include('layouts.partial.msg')
-
-    <section class="content">
-        <div class="container-fluid">
-            <div class="row justify-content-center">
-                <div class="col-lg-10">
-                    <div class="card">
-                        <div class="card-header bg-secondary">
-                            <h3 class="card-title">
-                                <i class="fas fa-file-invoice mr-2"></i> Información de la Orden
-                            </h3>
-                        </div>
-                        <form method="POST" action="{{ route('ordencompras.store') }}" id="ordenForm">
-                            @csrf
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>Proveedor <strong style="color:red;">(*)</strong></label>
-                                            <select name="proveedor_id" class="form-control" required>
-                                                <option value="">Seleccione un proveedor</option>
-                                                @foreach($proveedores as $proveedor)
-                                                    <option value="{{ $proveedor->id }}">{{ $proveedor->nombre }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>Fecha <strong style="color:red;">(*)</strong></label>
-                                            <input type="date" name="fecha" class="form-control" value="{{ date('Y-m-d') }}" required>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-group">
-                                            <label>Tipo de Pago <strong style="color:red;">(*)</strong></label>
-                                            <select name="tipopago" class="form-control" id="tipopagoSelect" required>
-                                                <option value="contado">Contado</option>
-                                                <option value="credito">Crédito</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6" id="metodopagoDiv">
-                                        <div class="form-group">
-                                            <label>Método de Pago <strong style="color:red;">(*)</strong></label>
-                                            <select name="metodopago_id" class="form-control" required>
-                                                <option value="">Seleccione un método</option>
-                                                @foreach($metodosPago as $metodo)
-                                                    <option value="{{ $metodo->id }}">{{ $metodo->nombre }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <hr>
-
-                                <h4>Productos</h4>
-                                
-                                <div id="productos-container">
-                                    <div class="row producto-item mb-3">
-                                        <div class="col-md-5">
-                                            <select name="productos[0][id]" class="form-control producto-select" required>
-                                                <option value="">Seleccione un producto</option>
-                                                @foreach($productos as $producto)
-                                                    <option value="{{ $producto->id }}" 
-                                                            data-precio="{{ $producto->preciocompra }}"
-                                                            data-stock-actual="{{ $producto->stock }}"
-                                                            data-stock-maximo="{{ $producto->stockmaximo }}">
-                                                        {{ $producto->nombre }} - 
-                                                        Precio: ${{ number_format($producto->preciocompra, 2) }} | 
-                                                        Stock: {{ $producto->stock }} / {{ $producto->stockmaximo }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <input type="number" name="productos[0][cantidad]" class="form-control cantidad-input" placeholder="Cantidad" min="1" required>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <span class="subtotal-text">Subtotal: $0</span>
-                                        </div>
-                                        <div class="col-md-2">
-                                            <span class="stock-disponible badge badge-info">Disponible: --</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button type="button" id="add-producto" class="btn btn-sm btn-info mt-2">
-                                    <i class="fas fa-plus"></i> Agregar Producto
-                                </button>
-
-                                <hr>
-
-                                <div class="row">
-                                    <div class="col-md-6 offset-md-6">
-                                        <h3>Total: <span id="total-display" class="text-primary">$0.00</span></h3>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-footer">
-                                <button type="submit" class="btn btn-primary btn-flat">Registrar</button>
-                                <a href="{{ route('ordencompras.index') }}" class="btn btn-danger btn-flat">Atras</a>
-                            </div>
-                        </form>
+        <div class="card-body">
+            <form method="POST" action="{{ route('ordencompras.store') }}" id="ordenForm">
+                @csrf
+                
+                <!-- Proveedor y Fecha en dos columnas -->
+                <div class="two-columns">
+                    <div class="form-group">
+                        <label>Proveedor <strong style="color:red;">(*)</strong></label>
+                        <select name="proveedor_id" class="form-control" required>
+                            <option value="">Seleccione un proveedor</option>
+                            @foreach($proveedores as $proveedor)
+                                <option value="{{ $proveedor->id }}">{{ $proveedor->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Fecha y Hora <strong style="color:red;">(*)</strong></label>
+                        <input type="datetime-local" name="fecha" class="form-control" value="{{ date('Y-m-d\TH:i') }}" required>
                     </div>
                 </div>
-            </div>
+                
+                <!-- Tipo Pago y Método Pago en dos columnas -->
+                <div class="two-columns">
+                    <div class="form-group">
+                        <label>Tipo de Pago <strong style="color:red;">(*)</strong></label>
+                        <select name="tipopago" id="tipopagoSelect" class="form-control" required>
+                            <option value="contado">Contado</option>
+                            <option value="credito">Crédito</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="metodopagoDiv">
+                        <label>Método de Pago <strong style="color:red;">(*)</strong></label>
+                        <select name="metodopago_id" class="form-control" required>
+                            <option value="">Seleccione un método</option>
+                            @foreach($metodosPago as $metodo)
+                                <option value="{{ $metodo->id }}">{{ $metodo->nombre }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Abono inicial (solo para crédito) -->
+                <div id="abonoDiv" style="display: none;">
+                    <div class="two-columns">
+                        <div class="form-group">
+                            <label>Abono inicial</label>
+                            <input type="number" step="0.01" name="abono_inicial" id="abonoInicial" class="form-control" placeholder="0.00" min="0" value="0">
+                            <small class="text-muted">Monto que pagará ahora</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Saldo pendiente después del abono</label>
+                            <h4 id="saldoPendientePreview" class="text-warning">$0.00</h4>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <h4>Productos</h4>
+                
+                <!-- Producto y Cantidad en dos columnas -->
+                <div class="two-columns">
+                    <div class="form-group">
+                        <label>Producto 1</label>
+                        <select name="productos[0][id]" id="producto0" class="form-control" required>
+                            <option value="">Seleccione un producto</option>
+                            @foreach($productos as $producto)
+                                <option value="{{ $producto->id }}" 
+                                        data-precio="{{ $producto->preciocompra }}"
+                                        data-stock="{{ $producto->stock }}"
+                                        data-stockmaximo="{{ $producto->stockmaximo }}">
+                                    {{ $producto->nombre }} - ${{ number_format($producto->preciocompra, 2) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Cantidad 1</label>
+                        <input type="number" name="productos[0][cantidad]" id="cantidad0" class="form-control" min="1" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Subtotal 1:</label>
+                    <h4 id="subtotal0">$0.00</h4>
+                </div>
+                
+                <!-- Más productos (opcional) -->
+                <div id="productos-adicionales"></div>
+                
+                <button type="button" id="addProductoBtn" class="btn btn-sm btn-info">+ Agregar otro producto</button>
+                
+                <hr>
+                
+                <div class="form-group">
+                    <label><strong>TOTAL:</strong></label>
+                    <h2 id="totalGeneral" class="text-primary">$0.00</h2>
+                    <input type="hidden" name="total" id="totalHidden" value="0">
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Registrar</button>
+                <a href="{{ route('ordencompras.index') }}" class="btn btn-danger">Atras</a>
+            </form>
         </div>
-    </section>
+    </div>
 </div>
 
-@endsection
-
-@section('js')
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    let productoIndex = 1;
-
-    // Mostrar/ocultar método de pago - AHORA SIEMPRE VISIBLE
-    // El método de pago siempre se muestra porque es obligatorio para contado
-    // Si quieres ocultarlo para crédito, descomenta el código de abajo
+    // Elementos principales
+    const producto1 = document.getElementById('producto0');
+    const cantidad1 = document.getElementById('cantidad0');
+    const subtotal1 = document.getElementById('subtotal0');
+    const totalGeneral = document.getElementById('totalGeneral');
+    const totalHidden = document.getElementById('totalHidden');
+    const tipopagoSelect = document.getElementById('tipopagoSelect');
+    const abonoDiv = document.getElementById('abonoDiv');
+    const abonoInicial = document.getElementById('abonoInicial');
+    const saldoPendientePreview = document.getElementById('saldoPendientePreview');
     
-    // const tipopagoSelect = document.getElementById('tipopagoSelect');
-    // const metodopagoDiv = document.getElementById('metodopagoDiv');
+    let contadorProductos = 1;
     
-    // tipopagoSelect.addEventListener('change', function() {
-    //     if (this.value === 'contado') {
-    //         metodopagoDiv.style.display = 'block';
-    //         document.querySelector('select[name="metodopago_id"]').required = true;
-    //     } else {
-    //         metodopagoDiv.style.display = 'none';
-    //         document.querySelector('select[name="metodopago_id"]').required = false;
-    //     }
-    // });
-
-    // Calcular total
-    function calcularTotal() {
+    // Función para calcular todo
+    function calcularTodo() {
         let total = 0;
-        document.querySelectorAll('.producto-item').forEach(row => {
-            const select = row.querySelector('.producto-select');
-            const cantidad = row.querySelector('.cantidad-input').value;
-            const precio = select.options[select.selectedIndex]?.dataset.precio;
-            if (precio && cantidad && cantidad > 0) {
-                total += parseFloat(precio) * parseInt(cantidad);
-                row.querySelector('.subtotal-text').textContent = 'Subtotal: $' + (parseFloat(precio) * parseInt(cantidad)).toFixed(2);
-            } else {
-                row.querySelector('.subtotal-text').textContent = 'Subtotal: $0';
-            }
-        });
-        document.getElementById('total-display').textContent = '$' + total.toFixed(2);
-    }
-
-    // Actualizar disponibilidad
-    function actualizarDisponibilidad(select, cantidadInput, stockDisponibleSpan) {
-        const stockActual = parseInt(select.options[select.selectedIndex]?.dataset.stockActual || 0);
-        const stockMaximo = parseInt(select.options[select.selectedIndex]?.dataset.stockMaximo || 0);
-        const disponible = stockMaximo - stockActual;
         
-        if (disponible > 0) {
-            stockDisponibleSpan.textContent = `Disponible: ${disponible} uds`;
-            stockDisponibleSpan.className = 'badge badge-success';
-        } else {
-            stockDisponibleSpan.textContent = 'Disponible: 0 (stock lleno)';
-            stockDisponibleSpan.className = 'badge badge-danger';
-        }
+        // Calcular producto 0
+        let precio0 = producto1.options[producto1.selectedIndex]?.getAttribute('data-precio') || 0;
+        let cant0 = parseInt(cantidad1.value) || 0;
+        let subtotal0Valor = precio0 * cant0;
+        subtotal1.innerHTML = '$' + subtotal0Valor.toFixed(2);
+        total += subtotal0Valor;
         
-        // Validar cantidad y ajustar
-        const cantidad = parseInt(cantidadInput.value);
-        if (cantidad > disponible && disponible > 0) {
-            cantidadInput.value = disponible;
-            alert(`⚠️ Solo puedes comprar hasta ${disponible} unidades de este producto.`);
-            calcularTotal();
-        }
-    }
-
-    // Configurar fila
-    function configurarFila(row, showDeleteButton = true) {
-        const select = row.querySelector('.producto-select');
-        const cantidadInput = row.querySelector('.cantidad-input');
-        const stockDisponibleSpan = row.querySelector('.stock-disponible');
-        
-        const update = () => {
-            actualizarDisponibilidad(select, cantidadInput, stockDisponibleSpan);
-            calcularTotal();
-        };
-        
-        select.addEventListener('change', update);
-        cantidadInput.addEventListener('keyup', update);
-        cantidadInput.addEventListener('change', update);
-        
-        update();
-    }
-
-    // VALIDACIÓN ANTES DE ENVIAR EL FORMULARIO
-    document.getElementById('ordenForm').addEventListener('submit', function(e) {
-        let errores = [];
-        
-        // Validar que se haya seleccionado un método de pago
-        const metodopago = document.querySelector('select[name="metodopago_id"]').value;
-        if (!metodopago) {
-            errores.push('Debe seleccionar un método de pago');
-        }
-        
-        document.querySelectorAll('.producto-item').forEach(row => {
-            const select = row.querySelector('.producto-select');
-            const cantidad = parseInt(row.querySelector('.cantidad-input').value);
+        // Calcular productos adicionales
+        for (let i = 1; i < contadorProductos; i++) {
+            let productoSelect = document.getElementById(`producto${i}`);
+            let cantidadInput = document.getElementById(`cantidad${i}`);
+            let subtotalSpan = document.getElementById(`subtotal${i}`);
             
-            if (select.value && cantidad) {
-                const stockActual = parseInt(select.options[select.selectedIndex]?.dataset.stockActual || 0);
-                const stockMaximo = parseInt(select.options[select.selectedIndex]?.dataset.stockMaximo || 0);
-                const disponible = stockMaximo - stockActual;
-                const productoNombre = select.options[select.selectedIndex]?.text.split(' -')[0];
-                
-                if (cantidad > disponible) {
-                    errores.push(`"${productoNombre}": Solo puedes comprar ${disponible} unidades (Stock actual: ${stockActual}, Máximo: ${stockMaximo})`);
-                }
+            if (productoSelect && cantidadInput && subtotalSpan) {
+                let precio = productoSelect.options[productoSelect.selectedIndex]?.getAttribute('data-precio') || 0;
+                let cantidad = parseInt(cantidadInput.value) || 0;
+                let subtotal = precio * cantidad;
+                subtotalSpan.innerHTML = '$' + subtotal.toFixed(2);
+                total += subtotal;
             }
-        });
+        }
         
-        if (errores.length > 0) {
-            e.preventDefault();
-            alert('❌ ERRORES:\n\n' + errores.join('\n\n'));
+        // Actualizar total
+        totalGeneral.innerHTML = '$' + total.toFixed(2);
+        totalHidden.value = total;
+        
+        // Actualizar saldo pendiente si es crédito
+        if (tipopagoSelect.value === 'credito') {
+            let abono = parseFloat(abonoInicial?.value) || 0;
+            let saldo = total - abono;
+            if (saldo < 0) saldo = 0;
+            if (saldoPendientePreview) saldoPendientePreview.innerHTML = '$' + saldo.toFixed(2);
+        }
+    }
+    
+    // Mostrar/ocultar abono según tipo de pago
+    tipopagoSelect.addEventListener('change', function() {
+        if (this.value === 'credito') {
+            abonoDiv.style.display = 'block';
+        } else {
+            abonoDiv.style.display = 'none';
+            if (abonoInicial) abonoInicial.value = 0;
+            calcularTodo();
         }
     });
-
-    // Configurar filas existentes
-    document.querySelectorAll('.producto-item').forEach(row => configurarFila(row, false));
-
-    // Agregar producto
-    document.getElementById('add-producto').addEventListener('click', function() {
-        const container = document.getElementById('productos-container');
-        const template = document.querySelector('.producto-item:first');
-        const newRow = template.cloneNode(true);
+    
+    // Eventos para producto 0
+    producto1.addEventListener('change', calcularTodo);
+    cantidad1.addEventListener('keyup', calcularTodo);
+    cantidad1.addEventListener('change', calcularTodo);
+    
+    // Evento para abono
+    if (abonoInicial) {
+        abonoInicial.addEventListener('keyup', calcularTodo);
+        abonoInicial.addEventListener('change', calcularTodo);
+    }
+    
+    // Agregar producto adicional
+    document.getElementById('addProductoBtn').addEventListener('click', function() {
+        let container = document.getElementById('productos-adicionales');
+        let nuevoIndice = contadorProductos;
         
-        newRow.querySelector('select').value = '';
-        newRow.querySelector('.cantidad-input').value = '';
-        newRow.querySelector('.subtotal-text').textContent = 'Subtotal: $0';
-        newRow.querySelector('.stock-disponible').textContent = 'Disponible: --';
-        newRow.querySelector('.stock-disponible').className = 'badge badge-info';
-        
-        newRow.querySelector('select').name = `productos[${productoIndex}][id]`;
-        newRow.querySelector('.cantidad-input').name = `productos[${productoIndex}][cantidad]`;
+        let newRow = document.createElement('div');
+        newRow.className = 'producto-adicional';
+        newRow.style.border = '1px solid #ddd';
+        newRow.style.padding = '10px';
+        newRow.style.marginTop = '10px';
+        newRow.style.borderRadius = '5px';
+        newRow.innerHTML = `
+            <h5>Producto ${nuevoIndice + 1}</h5>
+            <div class="two-columns">
+                <div class="form-group">
+                    <label>Producto ${nuevoIndice + 1}</label>
+                    <select name="productos[${nuevoIndice}][id]" id="producto${nuevoIndice}" class="form-control" required>
+                        <option value="">Seleccione un producto</option>
+                        @foreach($productos as $producto)
+                            <option value="{{ $producto->id }}" 
+                                    data-precio="{{ $producto->preciocompra }}"
+                                    data-stock="{{ $producto->stock }}"
+                                    data-stockmaximo="{{ $producto->stockmaximo }}">
+                                {{ $producto->nombre }} - ${{ number_format($producto->preciocompra, 2) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad ${nuevoIndice + 1}</label>
+                    <input type="number" name="productos[${nuevoIndice}][cantidad]" id="cantidad${nuevoIndice}" class="form-control" min="1" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Subtotal ${nuevoIndice + 1}:</label>
+                <h5 id="subtotal${nuevoIndice}" class="subtotal-adicional">$0.00</h5>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm remove-producto" data-indice="${nuevoIndice}">Eliminar</button>
+            <hr>
+        `;
         
         container.appendChild(newRow);
-        configurarFila(newRow, true);
-        productoIndex++;
+        
+        // Eventos para el nuevo producto
+        let productoSelect = document.getElementById(`producto${nuevoIndice}`);
+        let cantidadInput = document.getElementById(`cantidad${nuevoIndice}`);
+        
+        productoSelect.addEventListener('change', calcularTodo);
+        cantidadInput.addEventListener('keyup', calcularTodo);
+        cantidadInput.addEventListener('change', calcularTodo);
+        
+        // Botón eliminar
+        newRow.querySelector('.remove-producto').addEventListener('click', function() {
+            newRow.remove();
+            calcularTodo();
+        });
+        
+        contadorProductos++;
+        calcularTodo();
     });
-
-    // Inicializar
-    // tipopagoSelect.dispatchEvent(new Event('change'));
-});
+    
+    // Calcular al inicio
+    calcularTodo();
 </script>
 @endsection
