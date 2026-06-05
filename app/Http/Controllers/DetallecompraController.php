@@ -1,9 +1,9 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
-use App\Models\Detallecompra;
-use App\Models\Ordencompra;
+use App\Models\DetalleCompra;
+use App\Models\OrdenCompra;
 use App\Models\Producto;
 use App\Models\Kardex;
 use Illuminate\Http\Request;
@@ -15,8 +15,8 @@ class DetalleCompraController extends Controller
     // =========================
     public function index()
     {
-        // 🔥 cargamos orden y producto para poder mostrar datos relacionados
-        $detalles = Detallecompra::with(['ordenCompra', 'producto'])
+        // ðŸ”¥ cargamos orden y producto para poder mostrar datos relacionados
+        $detalles = DetalleCompra::with(['ordenCompra', 'producto'])
             ->paginate(10);
 
         return view('detallecompras.index', compact('detalles'));
@@ -27,7 +27,7 @@ class DetalleCompraController extends Controller
     // =========================
     public function create()
     {
-        $ordenes = Ordencompra::where('estado', 1)->get();
+        $ordenes = OrdenCompra::where('estado', 1)->get();
         $productos = Producto::where('estado', 1)->get();
 
         return view('detallecompras.create', compact('ordenes', 'productos'));
@@ -47,12 +47,12 @@ class DetalleCompraController extends Controller
 
         $producto = Producto::findOrFail($request->producto_id);
 
-        // 💡 aumenta stock
+        // ðŸ’¡ aumenta stock
         $producto->stockmaximo += $request->cantidad;
         $producto->save();
 
-        // 💡 crear detalle
-        $detalle = Detallecompra::create([
+        // ðŸ’¡ crear detalle
+        $detalle = DetalleCompra::create([
             'ordencompra_id' => $request->ordencompra_id,
             'producto_id' => $request->producto_id,
             'cantidad' => $request->cantidad,
@@ -60,13 +60,13 @@ class DetalleCompraController extends Controller
             'registradopor' => auth()->user()->name
         ]);
 
-        // 💡 actualizar orden
-        $orden = Ordencompra::findOrFail($request->ordencompra_id);
+        // ðŸ’¡ actualizar orden
+        $orden = OrdenCompra::findOrFail($request->ordencompra_id);
         $orden->total += $request->subtotal;
         $orden->saldopendiente = $orden->total;
         $orden->save();
 
-        // 💡 kardex entrada
+        // ðŸ’¡ kardex entrada
         Kardex::create([
             'producto_id' => $producto->id,
             'tipo' => 'entrada',
@@ -84,8 +84,8 @@ class DetalleCompraController extends Controller
     // =========================
     public function edit($id)
     {
-        $detalle = Detallecompra::findOrFail($id);
-        $ordenes = Ordencompra::where('estado', 1)->get();
+        $detalle = DetalleCompra::findOrFail($id);
+        $ordenes = OrdenCompra::where('estado', 1)->get();
         $productos = Producto::where('estado', 1)->get();
 
         return view('detallecompras.edit', compact('detalle', 'ordenes', 'productos'));
@@ -96,7 +96,7 @@ class DetalleCompraController extends Controller
     // =========================
     public function update(Request $request, $id)
     {
-        $detalle = Detallecompra::findOrFail($id);
+        $detalle = DetalleCompra::findOrFail($id);
 
         $request->validate([
             'ordencompra_id' => 'required|exists:ordencompras,id',
@@ -127,7 +127,7 @@ class DetalleCompraController extends Controller
             'producto_id' => $producto->id,
             'tipo' => 'ajuste',
             'cantidad' => $request->cantidad,
-            'referencia' => 'Edición detalle #' . $detalle->id,
+            'referencia' => 'EdiciÃ³n detalle #' . $detalle->id,
             'registradopor' => auth()->user()->name
         ]);
 
@@ -140,7 +140,7 @@ class DetalleCompraController extends Controller
     // =========================
     public function destroy($id)
     {
-        $detalle = Detallecompra::findOrFail($id);
+        $detalle = DetalleCompra::findOrFail($id);
 
         $producto = Producto::findOrFail($detalle->producto_id);
 
@@ -151,7 +151,7 @@ class DetalleCompraController extends Controller
             'producto_id' => $producto->id,
             'tipo' => 'salida',
             'cantidad' => $detalle->cantidad,
-            'referencia' => 'Eliminación detalle #' . $detalle->id,
+            'referencia' => 'EliminaciÃ³n detalle #' . $detalle->id,
             'registradopor' => auth()->user()->name
         ]);
 
@@ -161,3 +161,6 @@ class DetalleCompraController extends Controller
             ->with('success', 'Eliminado correctamente');
     }
 }
+
+
+

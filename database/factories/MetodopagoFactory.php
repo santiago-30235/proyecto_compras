@@ -2,13 +2,13 @@
 
 namespace Database\Factories;
 
-use App\Models\Metodopago;
+use App\Models\MetodoPago;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Metodopago>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\MetodoPago>
  */
-class MetodopagoFactory extends Factory
+class MetodoPagoFactory extends Factory
 {
     /**
      * Define the model's default state.

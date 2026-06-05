@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
@@ -26,7 +26,7 @@ class HomeController extends Controller
 
         $totalMetodos = MetodoPago::count();
 
-        $totalDetalles = Detallecompra::count();
+        $totalDetalles = DetalleCompra::count();
 
         // =========================
         // Retornar vista

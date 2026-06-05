@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\OrdenCompra;
 
 class Proveedor extends Model
 {
@@ -23,6 +24,6 @@ class Proveedor extends Model
 
     public function ordenCompras()
     {
-        return $this->hasMany(Ordencompra::class, 'proveedor_id');
+        return $this->hasMany(OrdenCompra::class, 'proveedor_id');
     }
 }

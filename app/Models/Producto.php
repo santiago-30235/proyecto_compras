@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\DetalleCompra;
 
 class Producto extends Model
 {
@@ -24,6 +25,6 @@ class Producto extends Model
 
     public function detallesCompras()
     {
-        return $this->hasMany(Detallecompra::class, 'producto_id');
+        return $this->hasMany(DetalleCompra::class, 'producto_id');
     }
 }

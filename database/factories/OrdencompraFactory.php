@@ -2,16 +2,16 @@
 
 namespace Database\Factories;
 
-use App\Models\Ordencompra;
+use App\Models\OrdenCompra;
 use App\Models\Proveedor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ordencompra>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\OrdenCompra>
  */
-class OrdencompraFactory extends Factory
+class OrdenCompraFactory extends Factory
 {
-    protected $model = Ordencompra::class;
+    protected $model = OrdenCompra::class;
     /**
      * Define the model's default state.
      *
