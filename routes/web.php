@@ -11,6 +11,12 @@ use App\Http\Controllers\DetalleCompraController;
 use App\Http\Controllers\MetodoPagoController;
 use App\Http\Controllers\PagoController;
 
+Route::pattern('proveedor', '[0-9]+');
+
+Route::get('/favicon.ico', function () {
+    return response()->file(public_path('favicon.ico'));
+});
+
 // =========================
 // RUTA PRINCIPAL
 // =========================
@@ -71,8 +77,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('cambioestadoordencompra', [OrdenCompraController::class, 'cambioestado'])->name('cambioestadoordencompra');
     
     // PDF y EXCEL
-    Route::get('ordencompras/pdf/{id}', [OrdenCompraController::class, 'generarPDF'])->name('ordencompras.pdf');
-    Route::get('ordencompras/excel/{id}', [OrdenCompraController::class, 'generarExcel'])->name('ordencompras.excel');
+    Route::get('ordencompras/pdf/{id}', [OrdenCompraController::class, 'generarPDF'])->name('ordencompras.pdf')->whereNumber('id');
+    Route::get('ordencompras/excel/{id}', [OrdenCompraController::class, 'generarExcel'])->name('ordencompras.excel')->whereNumber('id');
     Route::get('ordenes/exportar', [OrdenCompraController::class, 'exportarExcel'])->name('ordenes.exportar');
 
     // =========================
