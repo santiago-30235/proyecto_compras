@@ -50,7 +50,7 @@
                 
                 <div style="line-height: 1.3;">
                     <div style="font-size: 13px; font-weight: 600; color: #2d3748;">
-                        {{ Auth::user()->name }} <i class="fas fa-camera text-muted" style="font-size: 10px; margin-left: 2px;"></i>
+                        {{ Auth::user()->name }} 
                     </div>
                     <div style="font-size: 10px; color: #a0aec0;">
                         {{ Auth::user()->email }}
