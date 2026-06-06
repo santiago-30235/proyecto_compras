@@ -97,4 +97,9 @@ Route::middleware(['auth'])->group(function () {
     // =========================
     Route::resource('pagos', PagoController::class);
     Route::get('cambioestadopago', [PagoController::class, 'cambioestado'])->name('cambioestadopago');
+
+    // =========================
+    // PERFIL / FOTO DE PERFIL
+    // =========================
+    Route::post('/profile/upload-photo', [HomeController::class, 'uploadPhoto'])->name('profile.upload.photo');
 });
