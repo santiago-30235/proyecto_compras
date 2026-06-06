@@ -39,7 +39,7 @@
                     @if ($photo)
                         <img src="{{ asset($photo) }}" style="width: 100%; height: 100%; object-fit: cover;">
                     @else
-                        <img src="{{ asset('backend/dist/img/icon.jpg') }}" style="width: 100%; height: 100%; object-fit: cover;">
+                        <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=random&color=ffffff&size=128" style="width: 100%; height: 100%; object-fit: cover;">
                     @endif
                 </div>
                 <div style="line-height: 1.3;">
