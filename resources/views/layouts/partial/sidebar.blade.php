@@ -85,7 +85,7 @@
 
                                 <i class="nav-icon fas fa-people-carry"></i>
 
-                                <p>Proveedor</p>
+                                <p>Proveedores</p>
 
                             </a>
 
@@ -101,7 +101,7 @@
 
                                 <i class="nav-icon fas fa-box"></i>
 
-                                <p>Producto</p>
+                                <p>Productos</p>
 
                             </a>
 
@@ -117,7 +117,7 @@
 
                                 <i class="nav-icon fas fa-file-invoice"></i>
 
-                                <p>Orden Compras</p>
+                                <p>Órdenes de Compra</p>
 
                             </a>
 
@@ -133,7 +133,7 @@
 
                                 <i class="nav-icon fas fa-credit-card"></i>
 
-                                <p>Método Pagos</p>
+                                <p>Métodos de Pago</p>
 
                             </a>
 
@@ -149,7 +149,7 @@
 
                                 <i class="nav-icon fas fa-check-circle"></i>
 
-                                <p>Pago</p>
+                                <p>Pagos</p>
 
                             </a>
                         </li>

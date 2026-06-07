@@ -30,7 +30,7 @@
         </div>
         
         <div class="mt-8 text-center">
-            <p class="text-sm text-gray-500">¿Problemas? <a href="#" class="text-blue-600 hover:underline">Contáctanos</a></p>
+            <p class="text-sm text-gray-500">¿Problemas? <a href="mailto:soporte-compras@ufpso.edu.co?subject=Soporte%20Sistema%20de%20Compras&body=Hola,%20tengo%20problemas%20para%20ingresar%20al%20sistema." class="text-blue-600 hover:underline">Contáctanos</a></p>
         </div>
     </div>
 </body>
