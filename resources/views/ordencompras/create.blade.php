@@ -71,24 +71,22 @@
                         <select name="metodopago_id" class="form-control select2-busqueda" required>
                             <option value="">Seleccione un método</option>
                             @foreach($metodosPago as $metodo)
-                                <option value="{{ $metodo->id }}">{{ $metodo->nombre }}</option>
+                                <option value="{{ $metodo->id }}">{{ ucfirst($metodo->nombre) }}</option>
                             @endforeach
                         </select>
                     </div>
                 </div>
                 
                 <!-- Abono inicial (solo para crédito) -->
-                <div id="abonoDiv" style="display: none;">
-                    <div class="two-columns">
-                        <div class="form-group">
-                            <label>Abono inicial</label>
-                            <input type="number" step="0.01" name="abono_inicial" id="abonoInicial" class="form-control" placeholder="0.00" min="0" value="0">
-                            <small class="text-muted">Monto que pagará ahora</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Saldo pendiente después del abono</label>
-                            <h4 id="saldoPendientePreview" class="text-warning">$0.00</h4>
-                        </div>
+                <div id="abonoDiv" class="two-columns" style="display: none; margin-bottom: 20px;">
+                    <div class="form-group">
+                        <label>Abono inicial</label>
+                        <input type="number" step="0.01" name="abono_inicial" id="abonoInicial" class="form-control" placeholder="0.00" min="0" value="0">
+                        <small class="text-muted">Monto que pagará ahora</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Saldo pendiente después del abono</label>
+                        <h4 id="saldoPendientePreview" class="text-warning">$0.00</h4>
                     </div>
                 </div>
                 
@@ -200,7 +198,7 @@
     // Mostrar/ocultar abono según tipo de pago
     tipopagoSelect.addEventListener('change', function() {
         if (this.value === 'credito') {
-            abonoDiv.style.display = 'block';
+            abonoDiv.style.display = 'grid';
         } else {
             abonoDiv.style.display = 'none';
             if (abonoInicial) abonoInicial.value = 0;
@@ -265,7 +263,9 @@
         // Inicializar Select2 en el nuevo producto
         let $nuevoSelect = $(newRow).find('select.select2-busqueda');
         if ($nuevoSelect.length) {
-            $nuevoSelect.select2({ width: '100%' });
+            $nuevoSelect.each(function() {
+                initSelect2($(this));
+            });
         }
         
         // Eventos para el nuevo producto
@@ -291,9 +291,16 @@
 </script>
 @push('scripts')
 <script>
+    function initSelect2($select) {
+        $select.select2({
+            width: '100%',
+            dropdownParent: $select.parent()
+        });
+    }
+
     $(document).ready(function() {
-        $('.select2-busqueda').select2({
-            width: '100%'
+        $('.select2-busqueda').each(function() {
+            initSelect2($(this));
         });
     });
 </script>
