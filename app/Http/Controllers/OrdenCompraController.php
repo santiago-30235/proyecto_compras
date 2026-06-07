@@ -46,6 +46,8 @@ class OrdenCompraController extends Controller
             'productos' => 'required|array|min:1',
             'productos.*.id' => 'required|exists:productos,id',
             'productos.*.cantidad' => 'required|integer|min:1',
+            'numero_comprobante' => 'nullable|string|max:150',
+            'observaciones' => 'nullable|string|max:1000',
         ]);
 
         // VALIDACIÓN DE STOCK MÁXIMO
@@ -72,6 +74,8 @@ class OrdenCompraController extends Controller
             'saldopendiente' => 0,
             'estado' => '1',
             'registradopor' => auth()->user()->name,
+            'numero_comprobante' => $request->numero_comprobante ?? null,
+            'observaciones' => $request->observaciones ?? null,
         ]);
 
         // Crear detalles y calcular total
@@ -162,20 +166,32 @@ class OrdenCompraController extends Controller
 
     public function update(Request $request, $id)
     {
-        $orden = OrdenCompra::findOrFail($id);
+        $orden = OrdenCompra::with('pagos')->findOrFail($id);
 
         $request->validate([
             'proveedor_id' => 'required|exists:proveedores,id',
             'fecha' => 'required|date',
             'tipopago' => 'required|in:contado,credito',
+            'metodopago_id' => 'nullable|exists:metodopagos,id',
+            'numero_comprobante' => 'nullable|string|max:150',
+            'observaciones' => 'nullable|string|max:1000',
         ]);
 
         $orden->update([
             'fecha' => $request->fecha,
             'proveedor_id' => $request->proveedor_id,
             'tipopago' => $request->tipopago,
+            'numero_comprobante' => $request->numero_comprobante ?? null,
+            'observaciones' => $request->observaciones ?? null,
             'registradopor' => auth()->user()->name,
         ]);
+
+        if ($request->filled('metodopago_id')) {
+            $primerPago = $orden->pagos()->orderBy('id')->first();
+            if ($primerPago) {
+                $primerPago->update(['metodopago_id' => $request->metodopago_id]);
+            }
+        }
 
         return redirect()->route('ordencompras.index')->with('successMsg', 'Orden actualizada exitosamente');
     }

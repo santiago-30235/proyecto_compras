@@ -19,6 +19,8 @@ class OrdenCompra extends Model
         'saldopendiente',
         'estado',
         'registradopor',
+        'numero_comprobante',
+        'observaciones',
     ];
 
     public function proveedor()

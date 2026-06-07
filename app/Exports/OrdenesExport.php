@@ -17,6 +17,7 @@ class OrdenesExport implements FromCollection, WithHeadings
                 'ordencompras.id',
                 'proveedores.nombre as proveedor',
                 'ordencompras.fecha',
+                'ordencompras.created_at as created_at',
                 'ordencompras.total',
                 'ordencompras.tipopago',
                 DB::raw('COALESCE(SUM(pagos.monto), 0) as total_abonado')
@@ -25,6 +26,7 @@ class OrdenesExport implements FromCollection, WithHeadings
                 'ordencompras.id',
                 'proveedores.nombre',
                 'ordencompras.fecha',
+                'ordencompras.created_at',
                 'ordencompras.total',
                 'ordencompras.tipopago'
             )
@@ -47,7 +49,9 @@ class OrdenesExport implements FromCollection, WithHeadings
             return [
                 'ID' => $orden->id,
                 'PROVEEDOR' => $orden->proveedor,
-                'FECHA' => date('d/m/Y', strtotime($orden->fecha)),
+                'FECHA' => date('Y-m-d', strtotime($orden->fecha)),
+                'HORA' => date('h:i A', strtotime($orden->fecha)),
+                'FECHA Y HORA DE REGISTRO' => date('Y-m-d h:i A', strtotime($orden->created_at)),
                 'TIPO PAGO' => strtoupper($orden->tipopago),
                 'TOTAL ORDEN' => $orden->total,
                 'TOTAL ABONADO' => $totalAbonado,
@@ -63,6 +67,8 @@ class OrdenesExport implements FromCollection, WithHeadings
             'ID',
             'PROVEEDOR',
             'FECHA',
+            'HORA',
+            'FECHA Y HORA DE REGISTRO',
             'TIPO PAGO',
             'TOTAL ORDEN',
             'TOTAL ABONADO',
