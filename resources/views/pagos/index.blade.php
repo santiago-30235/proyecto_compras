@@ -66,7 +66,7 @@
                                         </td>
                                         <td>
                                             <span class="badge badge-info">
-                                                {{ $pago->metodoPago->nombre ?? 'N/A' }}
+                                                {{ ucfirst($pago->metodoPago->nombre ?? 'N/A') }}
                                             </span>
                                         </td>
                                         <td>{{ $pago->registradopor }}</td>

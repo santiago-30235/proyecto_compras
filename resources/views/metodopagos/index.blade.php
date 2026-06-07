@@ -51,9 +51,9 @@
                                     <tr>
                                         <td>{{ $metodopago->id }}</td>
                                         <td>
-                                            <strong>{{ $metodopago->nombre }}</strong>
+                                            <strong>{{ ucfirst($metodopago->nombre) }}</strong>
                                         </td>
-                                        <td>{{ $metodopago->descripcion ?? 'Sin descripción' }}</td>
+                                        <td>{{ ucfirst($metodopago->descripcion ?? 'Sin descripción') }}</td>
                                         <td>
                                             <input 
                                                 data-type="metodopago" 

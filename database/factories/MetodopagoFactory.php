@@ -18,13 +18,21 @@ class MetodoPagoFactory extends Factory
     public function definition(): array
     {
         $metodos = [
-            'efectivo',
-            'tarjeta',
-            'transferencia'
+            'Transferencia',
+            'Efectivo',
+            'Tarjeta'
         ];
+
+        $descripciones = [
+            'Pago rápido y seguro',
+            'Transferencia bancaria autorizada',
+            'Transacción con tarjeta de crédito o débito',
+            'Pago en efectivo validado en el punto de venta'
+        ];
+
         return [
             'nombre' => $this->faker->randomElement($metodos),
-            'descripcion' => $this->faker->sentence(),
+            'descripcion' => $this->faker->randomElement($descripciones),
             'estado' => '1',
             'registradopor' => $this->faker->randomElement(config('datos.registradopor')),
         ];
