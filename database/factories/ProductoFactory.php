@@ -21,14 +21,19 @@ class ProductoFactory extends Factory
         $producto = $this->faker->randomElement(config('datos.productos'));
 
         return [
-            'nombre' =>$producto['nombre'] ,
+            'nombre' => $producto['nombre'],
             'preciocompra' => $producto['precio'],
             'descripcion' => $this->faker->sentence(),
             'stockmaximo' => $stockmaximo,
             'stock' => $this->faker->numberBetween(0, $stockmaximo),
             'imagen' =>  $producto['imagen'],
             'estado' => '1',
-            'registradopor' => $this->faker->randomElement(config('datos.registradopor')),
+            'registradopor' => $this->faker->randomElement([
+                'Santiago Álvarez',
+                'Juan Manuel Garrido',
+                'John Stiven Santiago',
+                'Javier Mauricio Serna'
+            ]),
         ];
     }
 }
