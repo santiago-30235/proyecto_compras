@@ -42,7 +42,7 @@
                 <div class="two-columns">
                     <div class="form-group">
                         <label>Proveedor <strong style="color:red;">(*)</strong></label>
-                        <select name="proveedor_id" class="form-control" required>
+                        <select name="proveedor_id" class="form-control select2-busqueda" required>
                             <option value="">Seleccione un proveedor</option>
                             @foreach($proveedores as $proveedor)
                                 <option value="{{ $proveedor->id }}">{{ $proveedor->nombre }}</option>
@@ -68,7 +68,7 @@
                     
                     <div class="form-group" id="metodopagoDiv">
                         <label>Método de Pago <strong style="color:red;">(*)</strong></label>
-                        <select name="metodopago_id" class="form-control" required>
+                        <select name="metodopago_id" class="form-control select2-busqueda" required>
                             <option value="">Seleccione un método</option>
                             @foreach($metodosPago as $metodo)
                                 <option value="{{ $metodo->id }}">{{ $metodo->nombre }}</option>
@@ -100,7 +100,7 @@
                 <div class="two-columns">
                     <div class="form-group">
                         <label>Producto 1</label>
-                        <select name="productos[0][id]" id="producto0" class="form-control" required>
+                        <select name="productos[0][id]" id="producto0" class="form-control select2-busqueda" required>
                             <option value="">Seleccione un producto</option>
                             @foreach($productos as $producto)
                                 <option value="{{ $producto->id }}" 
@@ -235,7 +235,7 @@
             <div class="two-columns">
                 <div class="form-group">
                     <label>Producto ${nuevoIndice + 1}</label>
-                    <select name="productos[${nuevoIndice}][id]" id="producto${nuevoIndice}" class="form-control" required>
+                    <select name="productos[${nuevoIndice}][id]" id="producto${nuevoIndice}" class="form-control select2-busqueda" required>
                         <option value="">Seleccione un producto</option>
                         @foreach($productos as $producto)
                             <option value="{{ $producto->id }}" 
@@ -262,6 +262,12 @@
         
         container.appendChild(newRow);
         
+        // Inicializar Select2 en el nuevo producto
+        let $nuevoSelect = $(newRow).find('select.select2-busqueda');
+        if ($nuevoSelect.length) {
+            $nuevoSelect.select2({ width: '100%' });
+        }
+        
         // Eventos para el nuevo producto
         let productoSelect = document.getElementById(`producto${nuevoIndice}`);
         let cantidadInput = document.getElementById(`cantidad${nuevoIndice}`);
@@ -283,4 +289,13 @@
     // Calcular al inicio
     calcularTodo();
 </script>
+@push('scripts')
+<script>
+    $(document).ready(function() {
+        $('.select2-busqueda').select2({
+            width: '100%'
+        });
+    });
+</script>
+@endpush
 @endsection

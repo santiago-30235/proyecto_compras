@@ -40,7 +40,7 @@
                                     <div class="col-md-12">
                                         <div class="form-group">
                                             <label>Orden de Compra <strong style="color:red;">(*)</strong></label>
-                                            <select name="ordencompra_id" class="form-control" id="ordenSelect" required>
+                                            <select name="ordencompra_id" class="form-control select2-busqueda" id="ordenSelect" required>
                                                 <option value="">Seleccione una orden</option>
                                                 @foreach($ordenes as $orden)
                                                     <option value="{{ $orden->id }}" data-saldo="{{ $orden->saldopendiente }}">
@@ -64,7 +64,7 @@
                                     <div class="col-md-12">
                                         <div class="form-group">
                                             <label>Método de Pago <strong style="color:red;">(*)</strong></label>
-                                            <select name="metodopago_id" class="form-control" required>
+                                            <select name="metodopago_id" class="form-control select2-busqueda" required>
                                                 <option value="">Seleccione un método</option>
                                                 @foreach($metodos as $metodo)
                                                     <option value="{{ $metodo->id }}">{{ $metodo->nombre }}</option>
@@ -94,9 +94,13 @@
 
 @endsection
 
-@section('js')
+@push('scripts')
 <script>
     $(document).ready(function() {
+        $('.select2-busqueda').select2({
+            width: '100%'
+        });
+
         $('#ordenSelect').change(function() {
             var saldo = $(this).find(':selected').data('saldo');
             if (saldo) {
@@ -109,4 +113,4 @@
         });
     });
 </script>
-@endsection
+@endpush
