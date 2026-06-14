@@ -47,7 +47,7 @@
                                 </div>
 
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <div class="form-group">
                                             <label>Tipo de Pago <strong style="color:red;">(*)</strong></label>
                                             <select name="tipopago" class="form-control select2-busqueda rounded-lg border-gray-300" required>
@@ -56,7 +56,7 @@
                                             </select>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <div class="form-group">
                                             <label>Método de Pago</label>
                                             <select name="metodopago_id" class="form-control select2-busqueda rounded-lg border-gray-300">
@@ -67,29 +67,6 @@
                                                     </option>
                                                 @endforeach
                                             </select>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="form-group">
-                                            <label>Número de comprobante</label>
-                                            <input type="text" name="numero_comprobante" class="form-control rounded-lg border-gray-300" value="{{ $orden->numero_comprobante ?? '' }}" placeholder="Nro. factura o comprobante">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row">
-                                    <div class="col-md-12">
-                                        <div class="form-group">
-                                            <label>Observaciones</label>
-                                            <textarea name="observaciones" rows="4" class="form-control rounded-lg border-gray-300" placeholder="Notas internas o detalles adicionales">{{ $orden->observaciones ?? '' }}</textarea>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="row mt-3">
-                                    <div class="col-md-12">
-                                        <div class="alert alert-info">
-                                            <strong>Nota:</strong> El estado de la orden y del proveedor no se edita desde este formulario.
                                         </div>
                                     </div>
                                 </div>
