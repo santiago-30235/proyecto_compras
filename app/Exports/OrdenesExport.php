@@ -10,35 +10,44 @@ class OrdenesExport implements FromCollection, WithHeadings
 {
     public function collection()
     {
-        // Traemos los datos directamente de la tabla ordencompras, incluyendo el saldo real
+        // Volvemos a la consulta original que SÍ funciona y no tumba el sistema
         $ordenes = DB::table('ordencompras')
             ->leftJoin('proveedores', 'ordencompras.proveedor_id', '=', 'proveedores.id')
+            ->leftJoin('pagos', 'ordencompras.id', '=', 'pagos.ordencompra_id')
             ->select(
                 'ordencompras.id',
                 'proveedores.nombre as proveedor',
                 'ordencompras.fecha',
                 'ordencompras.total',
                 'ordencompras.tipopago',
-                'ordencompras.saldo' // <-- Campo clave para sincronizar con la pantalla web
+                DB::raw('COALESCE(SUM(pagos.monto), 0) as total_abonado')
+            )
+            ->groupBy(
+                'ordencompras.id',
+                'proveedores.nombre',
+                'ordencompras.fecha',
+                'ordencompras.total',
+                'ordencompras.tipopago'
             )
             ->orderBy('ordencompras.id')
             ->get();
 
         return $ordenes->map(function ($orden) {
-            // Normalizamos el tipo de pago para evitar errores de mayúsculas
             $tipoPagoLower = strtolower(trim($orden->tipopago));
 
-            // 1. Formateo estético del Tipo de Pago
+            // Conservamos tu cálculo matemático original para evitar conflictos
+            $totalAbonado = $tipoPagoLower === 'contado'
+                ? $orden->total
+                : $orden->total_abonado;
+
+            $saldoPendiente = $tipoPagoLower === 'contado'
+                ? 0
+                : max(0, $orden->total - $orden->total_abonado);
+
+            // 1. Limpieza de texto (Formato título bien elegante)
             $tipoPagoFormatted = $tipoPagoLower === 'contado' ? 'Contado' : 'Crédito';
 
-            // 2. El saldo pendiente será exactamente el mismo que muestra la web
-            $saldoPendiente = $orden->saldo;
-
-            // 3. El total abonado lo calculamos de forma lógica (Total - Saldo) 
-            // Esto limpia automáticamente cualquier dato basura de pruebas en la tabla pagos
-            $totalAbonado = max(0, $orden->total - $saldoPendiente);
-
-            // 4. Simplificación a los dos estados profesionales acordados
+            // 2. Reducción estricta a solo los DOS estados que me pediste
             $estadoPago = $saldoPendiente <= 0 ? 'Pagado' : 'Deuda Pendiente';
 
             return [
