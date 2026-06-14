@@ -17,7 +17,6 @@ class OrdenesExport implements FromCollection, WithHeadings
                 'ordencompras.id',
                 'proveedores.nombre as proveedor',
                 'ordencompras.fecha',
-                'ordencompras.created_at as created_at',
                 'ordencompras.total',
                 'ordencompras.tipopago',
                 DB::raw('COALESCE(SUM(pagos.monto), 0) as total_abonado')
@@ -26,7 +25,6 @@ class OrdenesExport implements FromCollection, WithHeadings
                 'ordencompras.id',
                 'proveedores.nombre',
                 'ordencompras.fecha',
-                'ordencompras.created_at',
                 'ordencompras.total',
                 'ordencompras.tipopago'
             )
@@ -34,25 +32,30 @@ class OrdenesExport implements FromCollection, WithHeadings
             ->get();
 
         return $ordenes->map(function ($orden) {
-            $totalAbonado = $orden->tipopago === 'contado'
+            // Normalizamos el tipo de pago para evitar conflictos de mayúsculas en BD
+            $tipoPagoLower = strtolower(trim($orden->tipopago));
+
+            // Lógica financiera de abonos y saldos
+            $totalAbonado = $tipoPagoLower === 'contado'
                 ? $orden->total
                 : $orden->total_abonado;
 
-            $saldoPendiente = $orden->tipopago === 'contado'
+            $saldoPendiente = $tipoPagoLower === 'contado'
                 ? 0
                 : max(0, $orden->total - $orden->total_abonado);
 
-            $estadoPago = $orden->tipopago === 'contado'
-                ? 'PAGADO TOTALMENTE'
-                : ($saldoPendiente > 0 ? 'CON DEUDA PENDIENTE' : 'CRÉDITO LIBERADO');
+            // 1. Formateo estético del Tipo de Pago (Con buena ortografía y tilde)
+            $tipoPagoFormatted = $tipoPagoLower === 'contado' ? 'Contado' : 'Crédito';
+
+            // 2. Simplificación a solo DOS estados profesionales como acordamos
+            $estadoPago = $saldoPendiente <= 0 ? 'Pagado' : 'Deuda Pendiente';
 
             return [
                 'ID' => $orden->id,
                 'PROVEEDOR' => $orden->proveedor,
                 'FECHA' => date('Y-m-d', strtotime($orden->fecha)),
                 'HORA' => date('h:i A', strtotime($orden->fecha)),
-                'FECHA Y HORA DE REGISTRO' => date('Y-m-d h:i A', strtotime($orden->created_at)),
-                'TIPO PAGO' => strtoupper($orden->tipopago),
+                'TIPO PAGO' => $tipoPagoFormatted,
                 'TOTAL ORDEN' => $orden->total,
                 'TOTAL ABONADO' => $totalAbonado,
                 'SALDO PENDIENTE' => $saldoPendiente,
@@ -68,7 +71,6 @@ class OrdenesExport implements FromCollection, WithHeadings
             'PROVEEDOR',
             'FECHA',
             'HORA',
-            'FECHA Y HORA DE REGISTRO',
             'TIPO PAGO',
             'TOTAL ORDEN',
             'TOTAL ABONADO',
