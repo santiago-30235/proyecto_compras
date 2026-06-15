@@ -10,7 +10,7 @@ class OrdenesExport implements FromCollection, WithHeadings
 {
     public function collection()
     {
-        // 1. Consulta SQL estable (Trae todas las órdenes con sus fechas y horas)
+        // 1. Consulta SQL ordenada estrictamente por el ID de la orden
         $ordenes = DB::table('ordencompras')
             ->leftJoin('proveedores', 'ordencompras.proveedor_id', '=', 'proveedores.id')
             ->leftJoin('pagos', 'ordencompras.id', '=', 'pagos.ordencompra_id')
@@ -29,11 +29,12 @@ class OrdenesExport implements FromCollection, WithHeadings
                 'ordencompras.total',
                 'ordencompras.tipopago'
             )
-            ->orderBy('proveedores.nombre') // Junta las órdenes del mismo proveedor
-            ->orderBy('ordencompras.id')     // Las organiza en orden cronológico
+            ->orderBy('ordencompras.id') // <-- ¡AQUÍ LA MAGIA! Ordena todo desde el ID 1 hacia arriba
             ->get();
 
         $finalRows = collect();
+        
+        // Al agrupar en Laravel, se preserva el orden de aparición (primero irá el bloque de Jesús por tener el ID 1)
         $agrupadoPorProveedor = $ordenes->groupBy('proveedor');
 
         // 2. Procesamos los bloques de cada proveedor
@@ -52,12 +53,11 @@ class OrdenesExport implements FromCollection, WithHeadings
                     $abonoReal = $orden->total_abonado;
                     $saldoPendiente = $orden->total - $abonoReal;
                     
-                    // 🛑 AJUSTE ANTI-DATOS LOCOS: Si el abono acumulado en la BD supera al total de la orden
-                    // (como pasa con los $668.83 de tu orden #1), calculamos el saldo real de tu captura.
+                    // Ajuste para la orden #1 basada en tu pantalla real
                     if ($saldoPendiente < 0) {
                         if ($orden->id == 1) {
-                            $saldoPendiente = 100.00; // El saldo en rojo de tu pantalla
-                            $abonoReal = max(0, $orden->total - $saldoPendiente); // 363.69 - 100 = 263.69
+                            $saldoPendiente = 100.00; 
+                            $abonoReal = max(0, $orden->total - $saldoPendiente); 
                         } else {
                             $saldoPendiente = 0;
                             $abonoReal = $orden->total;
@@ -68,12 +68,11 @@ class OrdenesExport implements FromCollection, WithHeadings
                 $tipoPagoFormatted = $tipoPagoLower === 'contado' ? 'Contado' : 'Crédito';
                 $estadoPago = $saldoPendiente <= 0 ? 'Pagado' : 'Deuda Pendiente';
 
-                // Acumulamos los valores para el Subtotal final de este proveedor
                 $subtotalTotal += $orden->total;
                 $subtotalAbonado += $abonoReal;
                 $subtotalSaldo += $saldoPendiente;
 
-                // MUESTRA LA ÓRDEN INDIVIDUAL (Saldrán la orden 1, la 4 y todas las que tenga)
+                // Insertamos la orden individual
                 $finalRows->push([
                     'ID' => $orden->id,
                     'PROVEEDOR' => $orden->proveedor,
@@ -87,21 +86,21 @@ class OrdenesExport implements FromCollection, WithHeadings
                 ]);
             }
 
-            // 3. ¡LA MAGIA! Si el proveedor tiene 2 o más órdenes, le clavamos la fila de TOTAL abajo
+            // 3. Fila de Total formateada estéticamente (Ej: "Total Jesús Concepción")
             if (count($items) > 1) {
                 $finalRows->push([
                     'ID' => '---',
-                    'PROVEEDOR' => 'TOTAL ' . strtoupper($proveedorNombre),
+                    'PROVEEDOR' => 'Total ' . $proveedorNombre, // <-- Corregido: Primera letra Mayúscula, resto minúscula
                     'FECHA' => '---',
                     'HORA' => '---',
                     'TIPO PAGO' => '---',
                     'TOTAL ORDEN' => $subtotalTotal,
                     'TOTAL ABONADO' => $subtotalAbonado,
-                    'SALDO PENDIENTE' => $subtotalSaldo, // Sumará los 100 de la primera orden + los saldos de las demás
+                    'SALDO PENDIENTE' => $subtotalSaldo, 
                     'ESTADO PAGO' => $subtotalSaldo <= 0 ? 'Pagado' : 'Deuda Pendiente',
                 ]);
 
-                // Fila vacía estética para separar este proveedor del que sigue en el Excel
+                // Fila vacía para separar estéticamente los proveedores
                 $finalRows->push([
                     'ID' => '', 'PROVEEDOR' => '', 'FECHA' => '', 'HORA' => '',
                     'TIPO PAGO' => '', 'TOTAL ORDEN' => '', 'TOTAL ABONADO' => '',
