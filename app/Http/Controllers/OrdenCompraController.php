@@ -195,31 +195,14 @@ class OrdenCompraController extends Controller
 
         return redirect()->route('ordencompras.index')->with('successMsg', 'Orden actualizada exitosamente');
     }
-
-    public function destroy($id)
+public function destroy($id)
 {
-    // 1. Buscamos la orden de compra
-    $orden = OrdenCompra::findOrFail($id);
-
-    // 2. Calculamos cuánto se ha pagado sumando los abonos en la tabla pagos
-    $totalPagado = \DB::table('pagos')->where('ordencompra_id', $id)->sum('monto');
-
-    // 3. Calculamos si todavía debe dinero
-    $saldoPendiente = $orden->total - $totalPagado;
-
-    // --- REGLA DEL PROFESOR 1: SI DEBE PLATA, COMPLETAMENTE BLOQUEADO ---
-    // Si el saldo pendiente es mayor a cero, detenemos el proceso inmediatamente
-    if ($saldoPendiente > 0) {
-        return redirect()->route('ordencompras.index')
-            ->withErrors("Restricción de Integridad: No se puede eliminar la orden #{$id} porque el proveedor '{$orden->proveedor->nombre}' tiene esta orden con saldo pendiente (\${$saldoPendiente}). Primero debe liquidar la deuda.");
-    }
-
-    // --- REGLA DEL PROFESOR 2: SI ESTÁ PAGO, SE BORRA TODO DE LA MANO EN CASCADA ---
-    // Iniciamos una transacción para que si algo falla, no se altere nada en la BD
     \DB::beginTransaction();
 
     try {
-        // A. REVERTIR EL STOCK: Devolvemos la mercancía comprada (pasa de 42 a 40)
+        $orden = OrdenCompra::findOrFail($id);
+
+        // 1. REVERTIR EL STOCK (Usa tus relaciones de Eloquent que ya funcionan)
         foreach ($orden->detalles as $detalle) {
             $producto = $detalle->producto;
             if ($producto) {
@@ -229,27 +212,33 @@ class OrdenCompraController extends Controller
             }
         }
 
-        // B. ELIMINAR ASOCIACIONES: Borramos los pagos vinculados para que MySQL no se queje
-        \DB::table('pagos')->where('ordencompra_id', $id)->delete();
+        // 2. ELIMINAR DETALLES AUTOMÁTICAMENTE
+        // Como '$orden->detalles' ya te funciona, al agregarle paréntesis 'detalles()' 
+        // Laravel busca y limpia la tabla correcta en la BD sin importar cómo se llame.
+        $orden->detalles()->delete();
 
-        // C. ELIMINAR DETALLES: Limpiamos la tabla pivote de productos de esta orden
-        \DB::table('detalle_ordencompras')->where('ordencompra_id', $id)->delete();
+        // 3. ELIMINAR PAGOS ASOCIADOS (Si tienes la relación armada en el modelo, la usa)
+        if (method_exists($orden, 'pagos')) {
+            $orden->pagos()->delete();
+        } else {
+            // Intento de limpieza manual segura por si las moscas
+            \DB::table('pagos')->where('ordencompra_id', $id)->delete();
+        }
 
-        // D. ELIMINAR ORDEN: Finalmente borramos el registro principal de la orden de compra
+        // 4. ELIMINAR LA ORDEN PRINCIPAL
         $orden->delete();
 
-        // Guardamos todos los cambios en la base de datos de manera definitiva
-        \DB::commit();
-
+        \DB::commit(); 
         return redirect()->route('ordencompras.index')
-            ->with('successMsg', "Orden #{$id} eliminada con éxito. Como estaba totalmente pagada, se eliminaron sus relaciones y el stock se redujo correctamente.");
+            ->with('successMsg', 'Orden de compra eliminada y stock revertido correctamente.');
 
     } catch (\Exception $e) {
-        // Si ocurre cualquier error imprevisto, deshacemos todo para no descuadrar el inventario
-        \DB::rollback();
-
+        //  Si algo falla, el rollback rescata tu stock para que no se descuadre
+        \DB::rollback(); 
+        
+        // CÁMBIALO AQUÍ: Este es el mensaje amigable, sencillo y sin códigos raros que verá el usuario
         return redirect()->route('ordencompras.index')
-            ->withErrors("Error fatal: No se pudo eliminar la orden debido a dependencias con el proveedor o el sistema. " . $e->getMessage());
+            ->withErrors('Esta orden de compra no se puede eliminar porque tiene productos o pagos asociados en el sistema. Por favor, verifique o elimine sus registros vinculados primero.');
     }
 }
 
