@@ -197,23 +197,61 @@ class OrdenCompraController extends Controller
     }
 
     public function destroy($id)
-    {
-        try {
-            $orden = OrdenCompra::findOrFail($id);
+{
+    // 1. Buscamos la orden de compra
+    $orden = OrdenCompra::findOrFail($id);
 
-            foreach ($orden->detalles as $detalle) {
-                $producto = $detalle->producto;
+    // 2. Calculamos cuánto se ha pagado sumando los abonos en la tabla pagos
+    $totalPagado = \DB::table('pagos')->where('ordencompra_id', $id)->sum('monto');
+
+    // 3. Calculamos si todavía debe dinero
+    $saldoPendiente = $orden->total - $totalPagado;
+
+    // --- REGLA DEL PROFESOR 1: SI DEBE PLATA, COMPLETAMENTE BLOQUEADO ---
+    // Si el saldo pendiente es mayor a cero, detenemos el proceso inmediatamente
+    if ($saldoPendiente > 0) {
+        return redirect()->route('ordencompras.index')
+            ->withErrors("Restricción de Integridad: No se puede eliminar la orden #{$id} porque el proveedor '{$orden->proveedor->nombre}' tiene esta orden con saldo pendiente (\${$saldoPendiente}). Primero debe liquidar la deuda.");
+    }
+
+    // --- REGLA DEL PROFESOR 2: SI ESTÁ PAGO, SE BORRA TODO DE LA MANO EN CASCADA ---
+    // Iniciamos una transacción para que si algo falla, no se altere nada en la BD
+    \DB::beginTransaction();
+
+    try {
+        // A. REVERTIR EL STOCK: Devolvemos la mercancía comprada (pasa de 42 a 40)
+        foreach ($orden->detalles as $detalle) {
+            $producto = $detalle->producto;
+            if ($producto) {
                 $producto->stock -= $detalle->cantidad;
                 if ($producto->stock < 0) $producto->stock = 0;
                 $producto->save();
             }
-
-            $orden->delete();
-            return redirect()->route('ordencompras.index')->with('successMsg', 'Orden eliminada exitosamente');
-        } catch (\Exception $e) {
-            return redirect()->route('ordencompras.index')->withErrors('No se puede eliminar la orden');
         }
+
+        // B. ELIMINAR ASOCIACIONES: Borramos los pagos vinculados para que MySQL no se queje
+        \DB::table('pagos')->where('ordencompra_id', $id)->delete();
+
+        // C. ELIMINAR DETALLES: Limpiamos la tabla pivote de productos de esta orden
+        \DB::table('detalle_ordencompras')->where('ordencompra_id', $id)->delete();
+
+        // D. ELIMINAR ORDEN: Finalmente borramos el registro principal de la orden de compra
+        $orden->delete();
+
+        // Guardamos todos los cambios en la base de datos de manera definitiva
+        \DB::commit();
+
+        return redirect()->route('ordencompras.index')
+            ->with('successMsg', "Orden #{$id} eliminada con éxito. Como estaba totalmente pagada, se eliminaron sus relaciones y el stock se redujo correctamente.");
+
+    } catch (\Exception $e) {
+        // Si ocurre cualquier error imprevisto, deshacemos todo para no descuadrar el inventario
+        \DB::rollback();
+
+        return redirect()->route('ordencompras.index')
+            ->withErrors("Error fatal: No se pudo eliminar la orden debido a dependencias con el proveedor o el sistema. " . $e->getMessage());
     }
+}
 
     public function cambioestado(Request $request)
     {
