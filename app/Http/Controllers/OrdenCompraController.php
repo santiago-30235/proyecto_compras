@@ -197,48 +197,58 @@ class OrdenCompraController extends Controller
     }
 public function destroy($id)
 {
+    // 1. CONTROL DE SEGURIDAD: Buscar la orden o lanzar un 404 limpio si no existe
+    $orden = OrdenCompra::findOrFail($id);
+
+    // 2. LÓGICA DE NEGOCIO REAL: Calcular el saldo pendiente sumando los abonos realizados
+    $totalPagado = \DB::table('pagos')->where('ordencompra_id', $id)->sum('monto');
+    $saldoPendiente = $orden->total - $totalPagado;
+
+    //  ESCENARIO A (MODO CANDADO): Si la orden debe plata, se bloquea con tu mensaje amigable
+    if ($saldoPendiente > 0) {
+        return redirect()->route('ordencompras.index')
+            ->withErrors('Esta orden de compra no se puede eliminar porque tiene un pago pendiente y un proveedor asociado con saldo activo. Por favor, verifique el estado financiero.');
+    }
+
+    //  ESCENARIO B (MODO CASCADA): Si está en cero ($0), se ejecuta la eliminación limpia
     \DB::beginTransaction();
 
     try {
-        $orden = OrdenCompra::findOrFail($id);
-
-        // 1. REVERTIR EL STOCK (Usa tus relaciones de Eloquent que ya funcionan)
+        // A. Reversión automática de Stock en bodega (Vuelve de 42 a 40)
         foreach ($orden->detalles as $detalle) {
             $producto = $detalle->producto;
             if ($producto) {
                 $producto->stock -= $detalle->cantidad;
-                if ($producto->stock < 0) $producto->stock = 0;
+                if ($producto->stock < 0) $producto->stock = 0; // Evita valores negativos
                 $producto->save();
             }
         }
 
-        // 2. ELIMINAR DETALLES AUTOMÁTICAMENTE
-        // Como '$orden->detalles' ya te funciona, al agregarle paréntesis 'detalles()' 
-        // Laravel busca y limpia la tabla correcta en la BD sin importar cómo se llame.
+        // B. Limpieza de detalles usando la relación de Eloquent para evitar errores en PostgreSQL
         $orden->detalles()->delete();
 
-        // 3. ELIMINAR PAGOS ASOCIADOS (Si tienes la relación armada en el modelo, la usa)
+        // C. Limpieza de los pagos asociados que ya estaban liquidados
         if (method_exists($orden, 'pagos')) {
             $orden->pagos()->delete();
         } else {
-            // Intento de limpieza manual segura por si las moscas
             \DB::table('pagos')->where('ordencompra_id', $id)->delete();
         }
 
-        // 4. ELIMINAR LA ORDEN PRINCIPAL
+        // D. Eliminación física del registro de la orden de compra
         $orden->delete();
 
+        // Si todo el proceso fue exitoso, guardamos los cambios en la Base de Datos
         \DB::commit(); 
+        
         return redirect()->route('ordencompras.index')
-            ->with('successMsg', 'Orden de compra eliminada y stock revertido correctamente.');
+            ->with('successMsg', 'Orden de compra eliminada correctamente y stock actualizado.');
 
     } catch (\Exception $e) {
-        //  Si algo falla, el rollback rescata tu stock para que no se descuadre
+        // Si ocurre cualquier error inesperado, cancelamos todo para proteger tus datos
         \DB::rollback(); 
         
-        // CÁMBIALO AQUÍ: Este es el mensaje amigable, sencillo y sin códigos raros que verá el usuario
         return redirect()->route('ordencompras.index')
-            ->withErrors('Esta orden de compra no se puede eliminar porque tiene productos o pagos asociados en el sistema. Por favor, verifique o elimine sus registros vinculados primero.');
+            ->withErrors('Ocurrió un error inesperado al procesar la eliminación.');
     }
 }
 
