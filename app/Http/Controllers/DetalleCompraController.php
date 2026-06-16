@@ -7,6 +7,9 @@ use App\Models\OrdenCompra;
 use App\Models\Producto;
 use App\Models\Kardex;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Exception;
 
 class DetalleCompraController extends Controller
 {
@@ -15,10 +18,7 @@ class DetalleCompraController extends Controller
     // =========================
     public function index()
     {
-        // ðŸ”¥ cargamos orden y producto para poder mostrar datos relacionados
-        $detalles = DetalleCompra::with(['ordenCompra', 'producto'])
-            ->paginate(10);
-
+        $detalles = DetalleCompra::with(['ordenCompra', 'producto'])->paginate(10);
         return view('detallecompras.index', compact('detalles'));
     }
 
@@ -29,7 +29,6 @@ class DetalleCompraController extends Controller
     {
         $ordenes = OrdenCompra::where('estado', 1)->get();
         $productos = Producto::where('estado', 1)->get();
-
         return view('detallecompras.create', compact('ordenes', 'productos'));
     }
 
@@ -40,43 +39,68 @@ class DetalleCompraController extends Controller
     {
         $request->validate([
             'ordencompra_id' => 'required|exists:ordencompras,id',
-            'producto_id' => 'required|exists:productos,id',
-            'cantidad' => 'required|integer|min:1',
-            'subtotal' => 'required|numeric|min:0'
+            'producto_id'    => 'required|exists:productos,id',
+            'cantidad'       => 'required|integer|min:1',
+            'subtotal'       => 'required|numeric|min:0'
         ]);
 
-        $producto = Producto::findOrFail($request->producto_id);
+        DB::beginTransaction();
 
-        // ðŸ’¡ aumenta stock
-        $producto->stockmaximo += $request->cantidad;
-        $producto->save();
+        try {
+            $producto = Producto::findOrFail($request->producto_id);
+            $orden = OrdenCompra::findOrFail($request->ordencompra_id);
+            $usuarioResponsable = auth()->check() ? auth()->user()->name : 'Sistema';
 
-        // ðŸ’¡ crear detalle
-        $detalle = DetalleCompra::create([
-            'ordencompra_id' => $request->ordencompra_id,
-            'producto_id' => $request->producto_id,
-            'cantidad' => $request->cantidad,
-            'subtotal' => $request->subtotal,
-            'registradopor' => auth()->user()->name
-        ]);
+            // Validar que el nuevo stock real no supere el stock máximo permitido
+            $nuevoStock = $producto->stock + $request->cantidad;
+            if ($nuevoStock > $producto->stockmaximo) {
+                $disponible = $producto->stockmaximo - $producto->stock;
+                DB::rollback();
+                return redirect()->back()
+                    ->withErrors(["No se puede agregar esta cantidad. El espacio disponible en stock máximo para '{$producto->nombre}' es de {$disponible} unidades."])
+                    ->withInput();
+            }
 
-        // ðŸ’¡ actualizar orden
-        $orden = OrdenCompra::findOrFail($request->ordencompra_id);
-        $orden->total += $request->subtotal;
-        $orden->saldopendiente = $orden->total;
-        $orden->save();
+            // Aumentar stock REAL de inventario
+            $producto->stock += $request->cantidad;
+            $producto->save();
 
-        // ðŸ’¡ kardex entrada
-        Kardex::create([
-            'producto_id' => $producto->id,
-            'tipo' => 'entrada',
-            'cantidad' => $request->cantidad,
-            'referencia' => 'Compra #' . $orden->id,
-            'registradopor' => auth()->user()->name
-        ]);
+            // Crear el detalle de compra
+            $detalle = DetalleCompra::create([
+                'ordencompra_id' => $request->ordencompra_id,
+                'producto_id'    => $request->producto_id,
+                'cantidad'       => $request->cantidad,
+                'subtotal'       => $request->subtotal,
+                'registradopor'  => $usuarioResponsable
+            ]);
 
-        return redirect()->route('detallecompras.index')
-            ->with('success', 'Compra registrada correctamente');
+            // Actualizar la orden de compra financieramente
+            $orden->total += $request->subtotal;
+            $orden->saldopendiente = $orden->total - DB::table('pagos')->where('ordencompra_id', $orden->id)->sum('monto');
+            if ($orden->saldopendiente < 0) {
+                $orden->saldopendiente = 0;
+            }
+            $orden->save();
+
+            // Registrar movimiento en el Kardex
+            Kardex::create([
+                'producto_id'    => $producto->id,
+                'tipo'           => 'entrada',
+                'cantidad'       => $request->cantidad,
+                'referencia'     => 'Compra #' . $orden->id,
+                'registradopor'  => $usuarioResponsable
+            ]);
+
+            DB::commit();
+            return redirect()->route('detallecompras.index')
+                ->with('successMsg', 'Detalle de compra registrado correctamente.');
+
+        } catch (Exception $e) {
+            DB::rollback();
+            Log::error('Error al registrar detalle de compra: ' . $e->getMessage());
+            return redirect()->route('detallecompras.index')
+                ->withErrors('Ocurrió un error al intentar registrar el detalle de la compra.');
+        }
     }
 
     // =========================
@@ -87,7 +111,6 @@ class DetalleCompraController extends Controller
         $detalle = DetalleCompra::findOrFail($id);
         $ordenes = OrdenCompra::where('estado', 1)->get();
         $productos = Producto::where('estado', 1)->get();
-
         return view('detallecompras.edit', compact('detalle', 'ordenes', 'productos'));
     }
 
@@ -96,43 +119,85 @@ class DetalleCompraController extends Controller
     // =========================
     public function update(Request $request, $id)
     {
-        $detalle = DetalleCompra::findOrFail($id);
-
         $request->validate([
             'ordencompra_id' => 'required|exists:ordencompras,id',
-            'producto_id' => 'required|exists:productos,id',
-            'cantidad' => 'required|integer|min:1',
-            'subtotal' => 'required|numeric|min:0'
+            'producto_id'    => 'required|exists:productos,id',
+            'cantidad'       => 'required|integer|min:1',
+            'subtotal'       => 'required|numeric|min:0'
         ]);
 
-        $producto = Producto::findOrFail($request->producto_id);
+        DB::beginTransaction();
 
-        // revertir stock anterior
-        $producto->stockmaximo -= $detalle->cantidad;
+        try {
+            $detalle = DetalleCompra::findOrFail($id);
+            $producto = Producto::findOrFail($request->producto_id);
+            $ordenAnterior = OrdenCompra::findOrFail($detalle->ordencompra_id);
+            $ordenNueva = OrdenCompra::findOrFail($request->ordencompra_id);
+            $usuarioResponsable = auth()->check() ? auth()->user()->name : 'Sistema';
 
-        // aplicar nuevo stock
-        $producto->stockmaximo += $request->cantidad;
+            // 1. Revertir cambios en el stock REAL del producto
+            $producto->stock -= $detalle->cantidad;
 
-        $producto->save();
+            // Validar que el nuevo stock modificado no supere el stock máximo
+            $nuevoStock = $producto->stock + $request->cantidad;
+            if ($nuevoStock > $producto->stockmaximo) {
+                DB::rollback();
+                return redirect()->back()
+                    ->withErrors(["La actualización supera el límite de stock máximo para '{$producto->nombre}'."])
+                    ->withInput();
+            }
 
-        $detalle->update([
-            'ordencompra_id' => $request->ordencompra_id,
-            'producto_id' => $request->producto_id,
-            'cantidad' => $request->cantidad,
-            'subtotal' => $request->subtotal,
-            'registradopor' => auth()->user()->name
-        ]);
+            // Aplicar el nuevo stock real
+            $producto->stock += $request->cantidad;
+            if ($producto->stock < 0) {
+                $producto->stock = 0;
+            }
+            $producto->save();
 
-        Kardex::create([
-            'producto_id' => $producto->id,
-            'tipo' => 'ajuste',
-            'cantidad' => $request->cantidad,
-            'referencia' => 'EdiciÃ³n detalle #' . $detalle->id,
-            'registradopor' => auth()->user()->name
-        ]);
+            // 2. Revertir montos de la orden anterior
+            $ordenAnterior->total -= $detalle->subtotal;
+            $ordenAnterior->saldopendiente = $ordenAnterior->total - DB::table('pagos')->where('ordencompra_id', $ordenAnterior->id)->sum('monto');
+            if ($ordenAnterior->saldopendiente < 0) {
+                $ordenAnterior->saldopendiente = 0;
+            }
+            $ordenAnterior->save();
 
-        return redirect()->route('detallecompras.index')
-            ->with('success', 'Actualizado correctamente');
+            // 3. Actualizar el registro del detalle
+            $detalle->update([
+                'ordencompra_id' => $request->ordencompra_id,
+                'producto_id'    => $request->producto_id,
+                'cantidad'       => $request->cantidad,
+                'subtotal'       => $request->subtotal,
+                'registradopor'  => $usuarioResponsable
+            ]);
+
+            // 4. Aplicar montos a la orden seleccionada (puede ser la misma o una nueva)
+            $ordenNueva->total += $request->subtotal;
+            $ordenNueva->saldopendiente = $ordenNueva->total - DB::table('pagos')->where('ordencompra_id', $ordenNueva->id)->sum('monto');
+            if ($ordenNueva->saldopendiente < 0) {
+                $ordenNueva->saldopendiente = 0;
+            }
+            $ordenNueva->save();
+
+            // 5. Registrar ajuste en Kardex
+            Kardex::create([
+                'producto_id'    => $producto->id,
+                'tipo'           => 'ajuste',
+                'cantidad'       => $request->cantidad,
+                'referencia'     => 'Edición detalle #' . $detalle->id,
+                'registradopor'  => $usuarioResponsable
+            ]);
+
+            DB::commit();
+            return redirect()->route('detallecompras.index')
+                ->with('successMsg', 'Detalle de compra actualizado correctamente.');
+
+        } catch (Exception $e) {
+            DB::rollback();
+            Log::error('Error al actualizar detalle de compra: ' . $e->getMessage());
+            return redirect()->route('detallecompras.index')
+                ->withErrors('Ocurrió un error al intentar actualizar el detalle de la compra.');
+        }
     }
 
     // =========================
@@ -140,27 +205,49 @@ class DetalleCompraController extends Controller
     // =========================
     public function destroy($id)
     {
-        $detalle = DetalleCompra::findOrFail($id);
+        DB::beginTransaction();
 
-        $producto = Producto::findOrFail($detalle->producto_id);
+        try {
+            $detalle = DetalleCompra::findOrFail($id);
+            $producto = Producto::findOrFail($detalle->producto_id);
+            $orden = OrdenCompra::findOrFail($detalle->ordencompra_id);
+            $usuarioResponsable = auth()->check() ? auth()->user()->name : 'Sistema';
 
-        $producto->stockmaximo -= $detalle->cantidad;
-        $producto->save();
+            // Descontar del stock REAL el inventario eliminado
+            $producto->stock -= $detalle->cantidad;
+            if ($producto->stock < 0) {
+                $producto->stock = 0;
+            }
+            $producto->save();
 
-        Kardex::create([
-            'producto_id' => $producto->id,
-            'tipo' => 'salida',
-            'cantidad' => $detalle->cantidad,
-            'referencia' => 'EliminaciÃ³n detalle #' . $detalle->id,
-            'registradopor' => auth()->user()->name
-        ]);
+            // Revertir el dinero de la orden de compra
+            $orden->total -= $detalle->subtotal;
+            $orden->saldopendiente = $orden->total - DB::table('pagos')->where('ordencompra_id', $orden->id)->sum('monto');
+            if ($orden->saldopendiente < 0) {
+                $orden->saldopendiente = 0;
+            }
+            $orden->save();
 
-        $detalle->delete();
+            // Kardex de salida por eliminación
+            Kardex::create([
+                'producto_id'    => $producto->id,
+                'tipo'           => 'salida',
+                'cantidad'       => $detalle->cantidad,
+                'referencia'     => 'Eliminación detalle #' . $detalle->id,
+                'registradopor'  => $usuarioResponsable
+            ]);
 
-        return redirect()->route('detallecompras.index')
-            ->with('success', 'Eliminado correctamente');
+            $detalle->delete();
+
+            DB::commit();
+            return redirect()->route('detallecompras.index')
+                ->with('successMsg', 'Detalle de compra eliminado correctamente.');
+
+        } catch (Exception $e) {
+            DB::rollback();
+            Log::error('Error al eliminar detalle de compra: ' . $e->getMessage());
+            return redirect()->route('detallecompras.index')
+                ->withErrors('Ocurrió un error al intentar eliminar el detalle de la compra.');
+        }
     }
 }
-
-
-
