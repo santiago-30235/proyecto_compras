@@ -78,15 +78,37 @@ class ProveedorController extends Controller
         return redirect()->route('proveedores.index')->with('successMsg', 'El registro se actualizó exitosamente');
     }
 
-    public function destroy($id)
+   public function destroy($id)
 {
+    // 1. Buscar el proveedor o lanzar un 404 si no existe
+    $proveedor = Proveedor::findOrFail($id);
+
+    // 2. Validar si tiene órdenes de compra asociadas para proteger la base de datos
+    $tieneOrdenes = false;
+    if (method_exists($proveedor, 'ordencompras')) {
+        $tieneOrdenes = $proveedor->ordencompras()->exists();
+    } elseif (method_exists($proveedor, 'ordenes')) {
+        $tieneOrdenes = $proveedor->ordenes()->exists();
+    } else {
+        // Plan B: Consulta directa para asegurar que corra perfecto en Render
+        $tieneOrdenes = \DB::table('ordencompras')->where('proveedor_id', $id)->exists() 
+                     || \DB::table('orden_compras')->where('proveedor_id', $id)->exists();
+    }
+
+    //  Si tiene historial, mensaje corto y directo
+    if ($tieneOrdenes) {
+        return redirect()->route('proveedores.index')
+            ->withErrors('No se puede eliminar este proveedor porque tiene órdenes de compra asociadas.');
+    }
+
+    //  Si está libre de registros, eliminación normal
     try {
-        $proveedor = Proveedor::findOrFail($id);
-        // Al eliminar el proveedor, por CASCADE se eliminan todas sus órdenes, detalles y pagos
         $proveedor->delete();
-        return redirect()->route('proveedores.index')->with('successMsg', 'Proveedor eliminado exitosamente');
-    } catch (QueryException $e) {
-        return redirect()->route('proveedores.index')->withErrors('No se puede eliminar el proveedor');
+        return redirect()->route('proveedores.index')
+            ->with('successMsg', 'Proveedor eliminado correctamente.');
+    } catch (\Exception $e) {
+        return redirect()->route('proveedores.index')
+            ->withErrors('Ocurrió un error al intentar eliminar el proveedor.');
     }
 }
 

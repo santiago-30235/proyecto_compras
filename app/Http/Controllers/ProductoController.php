@@ -107,20 +107,29 @@ public function update(Request $request, $id)
     return redirect()->route('productos.index')->with('successMsg', 'Producto actualizado exitosamente');
 }
 
-    public function destroy($id)
-    {
-        try {
-            $producto = Producto::findOrFail($id);
-            $producto->delete();
-            return redirect()->route('productos.index')->with('successMsg', 'Producto eliminado exitosamente');
-        } catch (QueryException $e) {
-            Log::error('Error al eliminar el producto: ' . $e->getMessage());
-            return redirect()->route('productos.index')->withErrors('No se puede eliminar el producto porque tiene compras relacionadas');
-        } catch (Exception $e) {
-            Log::error('Error inesperado: ' . $e->getMessage());
-            return redirect()->route('productos.index')->withErrors('Ocurrió un error inesperado');
-        }
+   public function destroy($id)
+{
+    try {
+        $producto = Producto::findOrFail($id);
+        $producto->delete();
+        
+        return redirect()->route('productos.index')
+            ->with('successMsg', 'Producto eliminado correctamente.');
+
+    } catch (QueryException $e) {
+        // Log interno para ti, pero el usuario ve un mensaje corto y limpio
+        Log::error('Error al eliminar el producto: ' . $e->getMessage());
+        
+        return redirect()->route('productos.index')
+            ->withErrors('No se puede eliminar este producto porque está asociado a una orden de compra.');
+
+    } catch (Exception $e) {
+        Log::error('Error inesperado: ' . $e->getMessage());
+        
+        return redirect()->route('productos.index')
+            ->withErrors('Ocurrió un error al intentar eliminar el producto.');
     }
+}
 
     public function cambioestado(Request $request)
     {

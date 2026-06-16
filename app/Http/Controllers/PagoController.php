@@ -98,25 +98,45 @@ class PagoController extends Controller
     }
 
     public function destroy($id)
-    {
-        try {
-            $pago = Pago::findOrFail($id);
-            $orden = $pago->ordenCompra;
+{
+    // 1. Iniciamos una transacción para que la contabilidad no se descuadre si algo falla
+    \DB::beginTransaction();
 
-            // Restaurar saldo pendiente
+    try {
+        $pago = Pago::findOrFail($id);
+        
+        // Buscamos la orden usando la relación (con plan B por si acaso)
+        $orden = $pago->ordenCompra ?? $pago->orden_compra ?? null;
+
+        if ($orden) {
+            // Restaurar saldo pendiente sumando el dinero del pago que se va a eliminar
             $nuevoSaldo = $orden->saldopendiente + $pago->monto;
+            
             $orden->update([
                 'saldopendiente' => $nuevoSaldo,
-                'estado' => 'pendiente',
+                'estado' => 'pendiente', // Mantiene el estado que ya tenías configurado
             ]);
-
-            $pago->delete();
-
-            return redirect()->route('pagos.index')->with('successMsg', 'Pago eliminado exitosamente');
-        } catch (Exception $e) {
-            return redirect()->route('pagos.index')->withErrors('No se puede eliminar el pago');
         }
+
+        // Eliminar físicamente el registro del pago
+        $pago->delete();
+
+        // Si todo el proceso fue exitoso, guardamos los cambios en la Base de Datos
+        \DB::commit();
+
+        return redirect()->route('pagos.index')
+            ->with('successMsg', 'Pago eliminado correctamente.');
+
+    } catch (\Exception $e) {
+        // Si algo falla en la mitad, deshacemos los cambios del saldo para proteger tus cuentas
+        \DB::rollback();
+        
+        \Log::error('Error al eliminar el pago: ' . $e->getMessage());
+
+        return redirect()->route('pagos.index')
+            ->withErrors('Ocurrió un error al intentar eliminar el pago.');
     }
+}
 
     public function cambioestado(Request $request)
     {

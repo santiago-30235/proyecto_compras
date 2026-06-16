@@ -59,19 +59,27 @@ class MetodoPagoController extends Controller
     }
 
     public function destroy($id)
-    {
-        try {
-            $metodopago = MetodoPago::findOrFail($id);
-            $metodopago->delete();
-            return redirect()->route('metodopagos.index')->with('successMsg', 'Método de pago eliminado exitosamente');
-        } catch (QueryException $e) {
-            Log::error('Error al eliminar el método de pago: ' . $e->getMessage());
-            return redirect()->route('metodopagos.index')->withErrors('No se puede eliminar el método de pago porque tiene pagos relacionados');
-        } catch (Exception $e) {
-            Log::error('Error inesperado: ' . $e->getMessage());
-            return redirect()->route('metodopagos.index')->withErrors('Ocurrió un error inesperado');
-        }
+{
+    try {
+        $metodopago = MetodoPago::findOrFail($id);
+        $metodopago->delete();
+        
+        return redirect()->route('metodopagos.index')
+            ->with('successMsg', 'Método de pago eliminado correctamente.');
+
+    } catch (QueryException $e) {
+        Log::error('Error al eliminar el método de pago: ' . $e->getMessage());
+        
+        return redirect()->route('metodopagos.index')
+            ->withErrors('No se puede eliminar este método de pago porque está asociado a un pago.');
+
+    } catch (Exception $e) {
+        Log::error('Error inesperado: ' . $e->getMessage());
+        
+        return redirect()->route('metodopagos.index')
+            ->withErrors('Ocurrió un error al intentar eliminar el método de pago.');
     }
+}
 
     public function cambioestado(Request $request)
     {

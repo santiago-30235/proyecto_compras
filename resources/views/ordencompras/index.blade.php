@@ -16,7 +16,34 @@
         </div>
     </section>
 
-    @include('layouts.partial.msg')
+
+    <div class="container-fluid">
+        {{--  ESCENARIO 1: SÓLO APARECE SI TODO SALIÓ BIEN --}}
+        @if(session('successMsg'))
+            <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 d-flex align-items-center" role="alert" 
+                 style="background-color: #e8f5e9; color: #2e7d32; border-left: 5px solid #4caf50; border-radius: 6px; padding: 14px 20px; font-size: 0.95rem; margin-bottom: 15px;">
+                <span style="font-size: 1.2rem; margin-right: 12px;">✅</span>
+                <div>
+                    <strong>¡Operación Exitosa!</strong> {{ session('successMsg') }}
+                </div>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close" 
+                        style="background: none; border: none; font-size: 1.2rem; color: #2e7d32; cursor: pointer; font-weight: bold; line-height: 1;"></button>
+            </div>
+        @endif
+
+        {{--  ESCENARIO 2: SÓLO APARECE UNA ÚNICA ADVERTENCIA SI ALGO LO BLOQUEA  --}}
+        @if($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 d-flex align-items-center" role="alert" 
+                 style="background-color: #ffebee; color: #c62828; border-left: 5px solid #ef5350; border-radius: 6px; padding: 14px 20px; font-size: 0.95rem; margin-bottom: 15px;">
+                <span style="font-size: 1.2rem; margin-right: 12px;">🚫</span>
+                <div>
+                    <strong>Atención del Sistema:</strong> {{ $errors->first() }}
+                </div>
+                <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close" 
+                        style="background: none; border: none; font-size: 1.2rem; color: #c62828; cursor: pointer; font-weight: bold; line-height: 1;"></button>
+            </div>
+        @endif
+    </div>
 
     <section class="content">
         <div class="container-fluid">
@@ -92,7 +119,6 @@
                                                     </button>
                                                 </form>
                                             </div>
-                                        </div>
                                         </td>
                                     </tr>
                                     @endforeach
