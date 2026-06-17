@@ -13,14 +13,51 @@ use Illuminate\Support\Facades\DB;
 
 class PagoController extends Controller
 {
-    public function index()
+    /**
+     * Display a listing of the resource with dynamic pagination and search.
+     */
+    public function index(Request $request)
     {
-        $pagos = Pago::with(['ordenCompra', 'metodoPago'])
-            ->orderBy('id', 'desc')
-            ->paginate(10);
+        // 1. Obtener el número de registros por página (por defecto 10)
+        $perPage = $request->input('per_page', 10);
+        
+        // 2. Obtener el término de búsqueda
+        $search = $request->input('search');
+        
+        // 3. Construir la consulta base
+        $query = Pago::with(['ordenCompra', 'metodoPago']);
+        
+        // 4. Aplicar búsqueda si existe
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'LIKE', "%{$search}%")
+                  ->orWhere('fechapago', 'LIKE', "%{$search}%")
+                  ->orWhere('monto', 'LIKE', "%{$search}%")
+                  ->orWhere('registradopor', 'LIKE', "%{$search}%")
+                  ->orWhereHas('ordenCompra', function($q2) use ($search) {
+                      $q2->where('id', 'LIKE', "%{$search}%")
+                         ->orWhere('total', 'LIKE', "%{$search}%")
+                         ->orWhere('tipopago', 'LIKE', "%{$search}%");
+                  })
+                  ->orWhereHas('metodoPago', function($q3) use ($search) {
+                      $q3->where('nombre', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+        
+        // 5. Ejecutar la consulta con paginación
+        $pagos = $query->orderBy('id', 'desc')->paginate($perPage);
+        
+        // 6. Mantener los parámetros en los links de paginación
+        $pagos->appends($request->all());
+        
+        // 7. Retornar la vista
         return view('pagos.index', compact('pagos'));
     }
 
+    /**
+     * Show the form for creating a new resource.
+     */
     public function create()
     {
         $ordenes = OrdenCompra::where('saldopendiente', '>', 0)->get();
@@ -28,6 +65,9 @@ class PagoController extends Controller
         return view('pagos.create', compact('ordenes', 'metodos'));
     }
 
+    /**
+     * Store a newly created resource in storage.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -71,12 +111,18 @@ class PagoController extends Controller
         }
     }
 
+    /**
+     * Display the specified resource.
+     */
     public function show($id)
     {
         $pago = Pago::with(['ordenCompra.proveedor', 'metodoPago'])->findOrFail($id);
         return view('pagos.show', compact('pago'));
     }
 
+    /**
+     * Show the form for editing the specified resource.
+     */
     public function edit($id)
     {
         $pago = Pago::findOrFail($id);
@@ -85,6 +131,9 @@ class PagoController extends Controller
         return view('pagos.edit', compact('pago', 'ordenes', 'metodos'));
     }
 
+    /**
+     * Update the specified resource in storage.
+     */
     public function update(Request $request, $id)
     {
         $pago = Pago::findOrFail($id);
@@ -130,6 +179,9 @@ class PagoController extends Controller
         }
     }
 
+    /**
+     * Remove the specified resource from storage.
+     */
     public function destroy($id)
     {
         $pago = Pago::find($id);
@@ -163,6 +215,9 @@ class PagoController extends Controller
         }
     }
 
+    /**
+     * Cambia el estado de un pago (Activo/Inactivo)
+     */
     public function cambioestado(Request $request)
     {
         $pago = Pago::find($request->id);
