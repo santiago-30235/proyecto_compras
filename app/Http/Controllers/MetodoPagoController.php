@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Metodopago;
+use App\Models\MetodoPago;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
-class MetodopagoController extends Controller
+class MetodoPagoController extends Controller
 {
     public function index()
     {
-        $metodopagos = Metodopago::orderBy('nombre')->paginate(10);
+        $metodopagos = MetodoPago::orderBy('nombre')->paginate(10);
         return view('metodopagos.index', compact('metodopagos'));
     }
 
@@ -29,7 +29,7 @@ class MetodopagoController extends Controller
         ]);
 
         try {
-            Metodopago::create([
+            MetodoPago::create([
                 'nombre'        => $request->nombre,
                 'descripcion'   => $request->descripcion,
                 'estado'        => 1,
@@ -48,19 +48,19 @@ class MetodopagoController extends Controller
 
     public function show($id)
     {
-        $metodopago = Metodopago::findOrFail($id);
+        $metodopago = MetodoPago::findOrFail($id);
         return view('metodopagos.show', compact('metodopago'));
     }
 
     public function edit($id)
     {
-        $metodopago = Metodopago::findOrFail($id);
+        $metodopago = MetodoPago::findOrFail($id);
         return view('metodopagos.edit', compact('metodopago'));
     }
 
     public function update(Request $request, $id)
     {
-        $metodopago = Metodopago::findOrFail($id);
+        $metodopago = MetodoPago::findOrFail($id);
 
         $request->validate([
             'nombre'      => 'required|string|max:255|unique:metodopagos,nombre,' . $id,
@@ -87,7 +87,7 @@ class MetodopagoController extends Controller
 
     public function destroy($id)
     {
-        $metodopago = Metodopago::find($id);
+        $metodopago = MetodoPago::find($id);
 
         if (!$metodopago) {
             return redirect()->route('metodopagos.index')
@@ -114,7 +114,7 @@ class MetodopagoController extends Controller
 
     public function cambioestado(Request $request)
     {
-        $metodopago = Metodopago::find($request->id);
+        $metodopago = MetodoPago::find($request->id);
 
         if (!$metodopago) {
             return response()->json(['success' => false, 'message' => 'Método de pago no encontrado'], 404);

@@ -107,7 +107,7 @@ class ProveedorController extends Controller
         }
 
         // Verificar si tiene órdenes de compra asociadas
-        if ($proveedor->ordencompras()->exists()) {
+        if ($proveedor->ordenCompras()->exists()) {
             return redirect()->route('proveedores.index')
                 ->with('error', 'No se puede eliminar este proveedor porque tiene órdenes de compra asociadas.');
         }

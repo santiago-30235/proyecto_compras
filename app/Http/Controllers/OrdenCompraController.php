@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Ordencompra;
-use App\Models\Detallecompra;
+use App\Models\OrdenCompra;
+use App\Models\DetalleCompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
-use App\Models\Metodopago;
+use App\Models\MetodoPago;
 use App\Models\Pago;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
@@ -15,11 +15,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\OrdencompraExport;
-use App\Exports\OrdenesComprasExport;
+use App\Exports\OrdenCompraExport;
 use App\Exports\OrdenesExport;
 
-class OrdencompraController extends Controller
+class OrdenCompraController extends Controller
 {
     public function exportarExcel()
     {
@@ -28,7 +27,7 @@ class OrdencompraController extends Controller
 
     public function index()
     {
-        $ordencompras = Ordencompra::with('proveedor')
+        $ordencompras = OrdenCompra::with('proveedor')
             ->orderBy('id', 'desc')
             ->paginate(10);
         return view('ordencompras.index', compact('ordencompras'));
@@ -38,7 +37,7 @@ class OrdencompraController extends Controller
     {
         $proveedores = Proveedor::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
-        $metodospago = Metodopago::where('estado', '1')->get();
+        $metodospago = MetodoPago::where('estado', '1')->get();
         return view('ordencompras.create', compact('proveedores', 'productos', 'metodospago'));
     }
 
@@ -70,7 +69,7 @@ class OrdencompraController extends Controller
             $usuarioResponsable = auth()->user()->name ?? 'Sistema';
             $total = 0;
 
-            $orden = Ordencompra::create([
+            $orden = OrdenCompra::create([
                 'fecha'              => $request->fecha,
                 'proveedor_id'       => $request->proveedor_id,
                 'total'              => 0,
@@ -85,7 +84,7 @@ class OrdencompraController extends Controller
                 $subtotal = $producto->preciocompra * $item['cantidad'];
                 $total += $subtotal;
 
-                Detallecompra::create([
+                DetalleCompra::create([
                     'ordencompra_id' => $orden->id,
                     'producto_id'    => $item['id'],
                     'cantidad'       => $item['cantidad'],
@@ -144,22 +143,22 @@ class OrdencompraController extends Controller
 
     public function show($id)
     {
-        $orden = Ordencompra::with(['proveedor', 'detalles.producto', 'pagos'])->findOrFail($id);
+        $orden = OrdenCompra::with(['proveedor', 'detalles.producto', 'pagos'])->findOrFail($id);
         return view('ordencompras.show', compact('orden'));
     }
 
     public function edit($id)
     {
-        $orden = Ordencompra::findOrFail($id);
+        $orden = OrdenCompra::findOrFail($id);
         $proveedores = Proveedor::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
-        $metodospago = Metodopago::where('estado', '1')->get();
+        $metodospago = MetodoPago::where('estado', '1')->get();
         return view('ordencompras.edit', compact('orden', 'proveedores', 'productos', 'metodospago'));
     }
 
     public function update(Request $request, $id)
     {
-        $orden = Ordencompra::findOrFail($id);
+        $orden = OrdenCompra::findOrFail($id);
 
         $request->validate([
             'proveedor_id' => 'required|exists:proveedores,id',
@@ -188,7 +187,7 @@ class OrdencompraController extends Controller
 
     public function destroy($id)
     {
-        $orden = Ordencompra::find($id);
+        $orden = OrdenCompra::find($id);
 
         if (!$orden) {
             return redirect()->route('ordencompras.index')
@@ -230,7 +229,7 @@ class OrdencompraController extends Controller
 
     public function cambioestado(Request $request)
     {
-        $orden = Ordencompra::find($request->id);
+        $orden = OrdenCompra::find($request->id);
 
         if (!$orden) {
             return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
@@ -244,7 +243,7 @@ class OrdencompraController extends Controller
 
     public function generarPDF($id)
     {
-        $orden = Ordencompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
+        $orden = OrdenCompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
         $data = ['orden' => $orden, 'fecha' => now()->format('d/m/Y H:i')];
         $pdf = Pdf::loadView('ordencompras.pdf', $data)->setPaper('a4', 'portrait');
         return $pdf->stream('orden-compra-' . $orden->id . '.pdf');
@@ -252,12 +251,12 @@ class OrdencompraController extends Controller
 
     public function generarExcel($id)
     {
-        $orden = Ordencompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
-        return Excel::download(new OrdencompraExport($orden), 'orden-compra-' . $id . '.xlsx');
+        $orden = OrdenCompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
+        return Excel::download(new OrdenCompraExport($orden), 'orden-compra-' . $id . '.xlsx');
     }
 
     public function generarExcelGeneral()
     {
-        return Excel::download(new OrdenesComprasExport(), 'ordenes-compras.xlsx');
+        return Excel::download(new OrdenesExport(), 'ordenes-compras.xlsx');
     }
 }

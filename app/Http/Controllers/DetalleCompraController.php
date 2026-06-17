@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Detallecompra;
-use App\Models\Ordencompra;
+use App\Models\DetalleCompra;
+use App\Models\OrdenCompra;
 use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +14,7 @@ class DetalleCompraController extends Controller
 {
     public function index()
     {
-        $detalles = Detallecompra::with(['ordencompra', 'producto'])
+        $detalles = DetalleCompra::with(['ordenCompra', 'producto'])
             ->orderBy('id', 'desc')
             ->paginate(10);
         return view('detallecompras.index', compact('detalles'));
@@ -22,7 +22,7 @@ class DetalleCompraController extends Controller
 
     public function create()
     {
-        $ordenes = Ordencompra::where('estado', '1')->get();
+        $ordenes = OrdenCompra::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
         return view('detallecompras.create', compact('ordenes', 'productos'));
     }
@@ -40,7 +40,7 @@ class DetalleCompraController extends Controller
 
         try {
             $producto = Producto::findOrFail($request->producto_id);
-            $orden = Ordencompra::findOrFail($request->ordencompra_id);
+            $orden = OrdenCompra::findOrFail($request->ordencompra_id);
             $usuario = auth()->user()->name ?? 'Sistema';
 
             $nuevoStock = $producto->stock + $request->cantidad;
@@ -54,7 +54,7 @@ class DetalleCompraController extends Controller
             $producto->stock = $nuevoStock;
             $producto->save();
 
-            Detallecompra::create([
+            DetalleCompra::create([
                 'ordencompra_id' => $request->ordencompra_id,
                 'producto_id'    => $request->producto_id,
                 'cantidad'       => $request->cantidad,
@@ -80,8 +80,8 @@ class DetalleCompraController extends Controller
 
     public function edit($id)
     {
-        $detalle = Detallecompra::findOrFail($id);
-        $ordenes = Ordencompra::where('estado', '1')->get();
+        $detalle = DetalleCompra::findOrFail($id);
+        $ordenes = OrdenCompra::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
         return view('detallecompras.edit', compact('detalle', 'ordenes', 'productos'));
     }
@@ -98,9 +98,9 @@ class DetalleCompraController extends Controller
         DB::beginTransaction();
 
         try {
-            $detalle = Detallecompra::findOrFail($id);
+            $detalle = DetalleCompra::findOrFail($id);
             $producto = Producto::findOrFail($request->producto_id);
-            $orden = Ordencompra::findOrFail($detalle->ordencompra_id);
+            $orden = OrdenCompra::findOrFail($detalle->ordencompra_id);
             $usuario = auth()->user()->name ?? 'Sistema';
 
             $producto->stock -= $detalle->cantidad;
@@ -149,9 +149,9 @@ class DetalleCompraController extends Controller
         DB::beginTransaction();
 
         try {
-            $detalle = Detallecompra::findOrFail($id);
+            $detalle = DetalleCompra::findOrFail($id);
             $producto = Producto::findOrFail($detalle->producto_id);
-            $orden = Ordencompra::findOrFail($detalle->ordencompra_id);
+            $orden = OrdenCompra::findOrFail($detalle->ordencompra_id);
 
             $producto->stock -= $detalle->cantidad;
             if ($producto->stock < 0) {

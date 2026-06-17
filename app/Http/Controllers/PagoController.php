@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pago;
-use App\Models\Ordencompra;
-use App\Models\Metodopago;
+use App\Models\OrdenCompra;
+use App\Models\MetodoPago;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Exception;
@@ -15,7 +15,7 @@ class PagoController extends Controller
 {
     public function index()
     {
-        $pagos = Pago::with(['ordencompra', 'metodopago'])
+        $pagos = Pago::with(['ordenCompra', 'metodoPago'])
             ->orderBy('id', 'desc')
             ->paginate(10);
         return view('pagos.index', compact('pagos'));
@@ -23,8 +23,8 @@ class PagoController extends Controller
 
     public function create()
     {
-        $ordenes = Ordencompra::where('saldopendiente', '>', 0)->get();
-        $metodos = Metodopago::where('estado', '1')->get();
+        $ordenes = OrdenCompra::where('saldopendiente', '>', 0)->get();
+        $metodos = MetodoPago::where('estado', '1')->get();
         return view('pagos.create', compact('ordenes', 'metodos'));
     }
 
@@ -36,7 +36,7 @@ class PagoController extends Controller
             'monto'          => 'required|numeric|min:0.01',
         ]);
 
-        $orden = Ordencompra::findOrFail($request->ordencompra_id);
+        $orden = OrdenCompra::findOrFail($request->ordencompra_id);
 
         if ($request->monto > $orden->saldopendiente) {
             return back()->withErrors('El monto no puede superar el saldo pendiente de $' . number_format($orden->saldopendiente, 2));
@@ -73,15 +73,15 @@ class PagoController extends Controller
 
     public function show($id)
     {
-        $pago = Pago::with(['ordencompra.proveedor', 'metodopago'])->findOrFail($id);
+        $pago = Pago::with(['ordenCompra.proveedor', 'metodoPago'])->findOrFail($id);
         return view('pagos.show', compact('pago'));
     }
 
     public function edit($id)
     {
         $pago = Pago::findOrFail($id);
-        $ordenes = Ordencompra::all();
-        $metodos = Metodopago::where('estado', '1')->get();
+        $ordenes = OrdenCompra::all();
+        $metodos = MetodoPago::where('estado', '1')->get();
         return view('pagos.edit', compact('pago', 'ordenes', 'metodos'));
     }
 
@@ -95,7 +95,7 @@ class PagoController extends Controller
             'monto'          => 'required|numeric|min:0.01',
         ]);
 
-        $orden = $pago->ordencompra;
+        $orden = $pago->ordenCompra;
         $diferencia = $request->monto - $pago->monto;
         $nuevoSaldo = $orden->saldopendiente - $diferencia;
 
@@ -136,7 +136,7 @@ class PagoController extends Controller
 
         try {
             $pago = Pago::findOrFail($id);
-            $orden = $pago->ordencompra;
+            $orden = $pago->ordenCompra;
 
             if ($orden) {
                 $nuevoSaldo = $orden->saldopendiente + $pago->monto;
