@@ -3,148 +3,174 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pago;
-use App\Models\OrdenCompra;
-use App\Models\MetodoPago;
-use App\Http\Requests\PagoRequest;
+use App\Models\Ordencompra;
+use App\Models\Metodopago;
+use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class PagoController extends Controller
 {
     public function index()
-{
-    $pagos = Pago::with(['ordenCompra', 'metodoPago'])->get(); // ← get(), no paginate()
-    return view('pagos.index', compact('pagos'));
-}
+    {
+        $pagos = Pago::with(['ordencompra', 'metodopago'])
+            ->orderBy('id', 'desc')
+            ->paginate(10);
+        return view('pagos.index', compact('pagos'));
+    }
 
     public function create()
     {
-        $ordenes = OrdenCompra::where('saldopendiente', '>', 0)->get();
-        $metodos = MetodoPago::where('estado', '1')->get();
+        $ordenes = Ordencompra::where('saldopendiente', '>', 0)->get();
+        $metodos = Metodopago::where('estado', '1')->get();
         return view('pagos.create', compact('ordenes', 'metodos'));
     }
 
-    public function store(PagoRequest $request)
+    public function store(Request $request)
     {
-        $orden = OrdenCompra::findOrFail($request->ordencompra_id);
+        $request->validate([
+            'ordencompra_id' => 'required|exists:ordencompras,id',
+            'metodopago_id'  => 'required|exists:metodopagos,id',
+            'monto'          => 'required|numeric|min:0.01',
+        ]);
 
-        // Validar que no se pague más del saldo pendiente
+        $orden = Ordencompra::findOrFail($request->ordencompra_id);
+
         if ($request->monto > $orden->saldopendiente) {
             return back()->withErrors('El monto no puede superar el saldo pendiente de $' . number_format($orden->saldopendiente, 2));
         }
 
-        // Crear pago
-        Pago::create([
-            'ordencompra_id' => $request->ordencompra_id,
-            'fechapago' => now(),
-            'monto' => $request->monto,
-            'metodopago_id' => $request->metodopago_id,
-            'registradopor' => auth()->user()->name,
-        ]);
+        DB::beginTransaction();
 
-        // Actualizar saldo pendiente
-        $nuevoSaldo = $orden->saldopendiente - $request->monto;
-        $orden->update([
-            'saldopendiente' => $nuevoSaldo,
-            'estado' => $nuevoSaldo <= 0 ? 'pagado' : 'pendiente',
-        ]);
+        try {
+            Pago::create([
+                'ordencompra_id' => $request->ordencompra_id,
+                'fechapago'      => now(),
+                'monto'          => $request->monto,
+                'metodopago_id'  => $request->metodopago_id,
+                'registradopor'  => auth()->user()->name ?? 'Sistema',
+            ]);
 
-        return redirect()->route('pagos.index')->with('successMsg', 'Pago registrado exitosamente');
+            $nuevoSaldo = $orden->saldopendiente - $request->monto;
+            $orden->update([
+                'saldopendiente' => $nuevoSaldo,
+                'estado'         => $nuevoSaldo <= 0 ? '1' : '1',
+            ]);
+
+            DB::commit();
+            return redirect()->route('pagos.index')
+                ->with('success', 'Pago registrado correctamente.');
+
+        } catch (Exception $e) {
+            DB::rollback();
+            Log::error('Error al registrar pago: ' . $e->getMessage());
+            return redirect()->route('pagos.index')
+                ->with('error', 'Ocurrió un error al registrar el pago.');
+        }
     }
 
     public function show($id)
     {
-        $pago = Pago::with(['ordenCompra.proveedor', 'metodoPago'])->findOrFail($id);
+        $pago = Pago::with(['ordencompra.proveedor', 'metodopago'])->findOrFail($id);
         return view('pagos.show', compact('pago'));
     }
 
     public function edit($id)
     {
         $pago = Pago::findOrFail($id);
-        $ordenes = OrdenCompra::all();
-        $metodos = MetodoPago::where('estado', '1')->get();
+        $ordenes = Ordencompra::all();
+        $metodos = Metodopago::where('estado', '1')->get();
         return view('pagos.edit', compact('pago', 'ordenes', 'metodos'));
     }
 
-    public function update(PagoRequest $request, $id)
+    public function update(Request $request, $id)
     {
         $pago = Pago::findOrFail($id);
-        $ordenAntes = $pago->ordenCompra;
 
-        // Si cambia el monto, ajustar saldo pendiente
-        if ($request->monto != $pago->monto) {
-            $diferencia = $request->monto - $pago->monto;
-            $nuevoSaldo = $ordenAntes->saldopendiente - $diferencia;
-            
-            if ($nuevoSaldo < 0) {
-                return back()->withErrors('El nuevo monto excede el saldo pendiente');
-            }
-            
-            $ordenAntes->update([
-                'saldopendiente' => $nuevoSaldo,
-                'estado' => $nuevoSaldo <= 0 ? 'pagado' : 'pendiente',
-            ]);
-        }
-
-        $pago->update([
-            'ordencompra_id' => $request->ordencompra_id,
-            'monto' => $request->monto,
-            'metodopago_id' => $request->metodopago_id,
-            'registradopor' => auth()->user()->name,
+        $request->validate([
+            'ordencompra_id' => 'required|exists:ordencompras,id',
+            'metodopago_id'  => 'required|exists:metodopagos,id',
+            'monto'          => 'required|numeric|min:0.01',
         ]);
 
-        return redirect()->route('pagos.index')->with('successMsg', 'Pago actualizado exitosamente');
+        $orden = $pago->ordencompra;
+        $diferencia = $request->monto - $pago->monto;
+        $nuevoSaldo = $orden->saldopendiente - $diferencia;
+
+        if ($nuevoSaldo < 0) {
+            return back()->withErrors('El nuevo monto excede el saldo pendiente.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $pago->update([
+                'ordencompra_id' => $request->ordencompra_id,
+                'monto'          => $request->monto,
+                'metodopago_id'  => $request->metodopago_id,
+                'registradopor'  => auth()->user()->name ?? 'Sistema',
+            ]);
+
+            $orden->update([
+                'saldopendiente' => $nuevoSaldo,
+                'estado'         => $nuevoSaldo <= 0 ? '1' : '1',
+            ]);
+
+            DB::commit();
+            return redirect()->route('pagos.index')
+                ->with('success', 'Pago actualizado correctamente.');
+
+        } catch (Exception $e) {
+            DB::rollback();
+            Log::error('Error al actualizar pago: ' . $e->getMessage());
+            return redirect()->route('pagos.index')
+                ->with('error', 'Ocurrió un error al actualizar el pago.');
+        }
     }
 
     public function destroy($id)
-{
-    // 1. Iniciamos una transacción para que la contabilidad no se descuadre si algo falla
-    \DB::beginTransaction();
+    {
+        DB::beginTransaction();
 
-    try {
-        $pago = Pago::findOrFail($id);
-        
-        // Buscamos la orden usando la relación (con plan B por si acaso)
-        $orden = $pago->ordenCompra ?? $pago->orden_compra ?? null;
+        try {
+            $pago = Pago::findOrFail($id);
+            $orden = $pago->ordencompra;
 
-        if ($orden) {
-            // Restaurar saldo pendiente sumando el dinero del pago que se va a eliminar
-            $nuevoSaldo = $orden->saldopendiente + $pago->monto;
-            
-            $orden->update([
-                'saldopendiente' => $nuevoSaldo,
-                'estado' => 'pendiente', // Mantiene el estado que ya tenías configurado
-            ]);
+            if ($orden) {
+                $nuevoSaldo = $orden->saldopendiente + $pago->monto;
+                $orden->update([
+                    'saldopendiente' => $nuevoSaldo,
+                    'estado'         => '1',
+                ]);
+            }
+
+            $pago->delete();
+
+            DB::commit();
+            return redirect()->route('pagos.index')
+                ->with('success', 'Pago eliminado correctamente.');
+
+        } catch (Exception $e) {
+            DB::rollback();
+            Log::error('Error al eliminar pago: ' . $e->getMessage());
+            return redirect()->route('pagos.index')
+                ->with('error', 'Ocurrió un error al eliminar el pago.');
         }
-
-        // Eliminar físicamente el registro del pago
-        $pago->delete();
-
-        // Si todo el proceso fue exitoso, guardamos los cambios en la Base de Datos
-        \DB::commit();
-
-        return redirect()->route('pagos.index')
-            ->with('successMsg', 'Pago eliminado correctamente.');
-
-    } catch (\Exception $e) {
-        // Si algo falla en la mitad, deshacemos los cambios del saldo para proteger tus cuentas
-        \DB::rollback();
-        
-        \Log::error('Error al eliminar el pago: ' . $e->getMessage());
-
-        return redirect()->route('pagos.index')
-            ->withErrors('Ocurrió un error al intentar eliminar el pago.');
     }
-}
 
     public function cambioestado(Request $request)
     {
         $pago = Pago::find($request->id);
-        if ($pago) {
-            $pago->estado = $request->estado;
-            $pago->save();
+
+        if (!$pago) {
+            return response()->json(['success' => false, 'message' => 'Pago no encontrado'], 404);
         }
+
+        $pago->estado = $request->estado;
+        $pago->save();
+
         return response()->json(['success' => true]);
     }
 }

@@ -40,7 +40,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label class="control-label">Nombre <strong style="color:red;">(*)</strong></label>
-                                            <input type="text" name="nombre" class="form-control" placeholder="Ingrese el nombre" value="{{ old('nombre') }}">
+                                            <input type="text" name="nombre" class="form-control" placeholder="Ingrese el nombre" value="{{ old('nombre') }}" required>
                                             @error('nombre')
                                                 <span class="text-danger">{{ $message }}</span>
                                             @enderror
@@ -49,7 +49,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label class="control-label">Precio de Compra <strong style="color:red;">(*)</strong></label>
-                                            <input type="number" step="0.01" name="preciocompra" class="form-control" placeholder="Ingrese el precio" value="{{ old('preciocompra') }}">
+                                            <input type="number" step="0.01" name="preciocompra" class="form-control" placeholder="Ingrese el precio" value="{{ old('preciocompra') }}" required>
                                             @error('preciocompra')
                                                 <span class="text-danger">{{ $message }}</span>
                                             @enderror
@@ -60,7 +60,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label class="control-label">Stock Máximo <strong style="color:red;">(*)</strong></label>
-                                            <input type="number" name="stockmaximo" class="form-control" placeholder="Ingrese el stock" value="{{ old('stockmaximo') }}">
+                                            <input type="number" name="stockmaximo" class="form-control" placeholder="Ingrese el stock" value="{{ old('stockmaximo') }}" required>
                                             @error('stockmaximo')
                                                 <span class="text-danger">{{ $message }}</span>
                                             @enderror
@@ -69,7 +69,7 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label class="control-label">Imagen</label>
-                                            <input type="file" name="imagen" class="form-control-file">
+                                            <input type="file" name="imagen" class="form-control-file" accept="image/*">
                                             @error('imagen')
                                                 <span class="text-danger">{{ $message }}</span>
                                             @enderror

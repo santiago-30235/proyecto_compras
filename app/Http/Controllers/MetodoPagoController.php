@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MetodoPago;
-use App\Http\Requests\MetodoPagoRequest;
-use Illuminate\Http\Request; 
+use App\Models\Metodopago;
+use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
-class MetodoPagoController extends Controller
+class MetodopagoController extends Controller
 {
     public function index()
     {
-        $metodopagos = MetodoPago::all();
+        $metodopagos = Metodopago::orderBy('nombre')->paginate(10);
         return view('metodopagos.index', compact('metodopagos'));
     }
 
@@ -22,92 +21,108 @@ class MetodoPagoController extends Controller
         return view('metodopagos.create');
     }
 
-    public function store(MetodoPagoRequest $request)
+    public function store(Request $request)
     {
-        // Envolvemos en try-catch para proteger el flujo de inserción
+        $request->validate([
+            'nombre'      => 'required|string|max:255|unique:metodopagos,nombre',
+            'descripcion' => 'nullable|string|max:255',
+        ]);
+
         try {
-            MetodoPago::create([
+            Metodopago::create([
                 'nombre'        => $request->nombre,
                 'descripcion'   => $request->descripcion,
-                'estado'        => '1',
-                'registradopor' => auth()->check() ? auth()->user()->name : 'Sistema',
+                'estado'        => 1,
+                'registradopor' => auth()->user()->name ?? 'Sistema',
             ]);
 
             return redirect()->route('metodopagos.index')
-                ->with('successMsg', 'Método de pago registrado correctamente.');
+                ->with('success', 'Método de pago registrado correctamente.');
 
         } catch (Exception $e) {
             Log::error('Error al registrar método de pago: ' . $e->getMessage());
             return redirect()->route('metodopagos.index')
-                ->withErrors('Ocurrió un error al intentar registrar el método de pago.');
+                ->with('error', 'Ocurrió un error al intentar registrar el método de pago.');
         }
     }
 
     public function show($id)
     {
-        $metodopago = MetodoPago::findOrFail($id);
+        $metodopago = Metodopago::findOrFail($id);
         return view('metodopagos.show', compact('metodopago'));
     }
 
     public function edit($id)
     {
-        $metodopago = MetodoPago::findOrFail($id);
+        $metodopago = Metodopago::findOrFail($id);
         return view('metodopagos.edit', compact('metodopago'));
     }
 
-    public function update(MetodoPagoRequest $request, $id)
+    public function update(Request $request, $id)
     {
-        // Envolvemos en try-catch para proteger el flujo de edición
-        try {
-            $metodopago = MetodoPago::findOrFail($id);
+        $metodopago = Metodopago::findOrFail($id);
 
+        $request->validate([
+            'nombre'      => 'required|string|max:255|unique:metodopagos,nombre,' . $id,
+            'descripcion' => 'nullable|string|max:255',
+        ]);
+
+        try {
             $metodopago->update([
-                'nombre'        => $request->nombre,
-                'descripcion'   => $request->descripcion,
-                'registradopor' => auth()->check() ? auth()->user()->name : 'Sistema',
+                'nombre'      => $request->nombre,
+                'descripcion' => $request->descripcion,
+                // 'estado' no se actualiza aquí (se maneja con toggle)
+                // 'registradopor' no se actualiza aquí (es histórico)
             ]);
 
             return redirect()->route('metodopagos.index')
-                ->with('successMsg', 'Método de pago actualizado correctamente.');
+                ->with('success', 'Método de pago actualizado correctamente.');
 
         } catch (Exception $e) {
             Log::error('Error al actualizar método de pago: ' . $e->getMessage());
             return redirect()->route('metodopagos.index')
-                ->withErrors('Ocurrió un error al intentar actualizar el método de pago.');
+                ->with('error', 'Ocurrió un error al intentar actualizar el método de pago.');
         }
     }
 
     public function destroy($id)
     {
-        try {
-            $metodopago = MetodoPago::findOrFail($id);
-            $metodopago->delete();
-            
-            return redirect()->route('metodopagos.index')
-                ->with('successMsg', 'Método de pago eliminado correctamente.');
+        $metodopago = Metodopago::find($id);
 
-        } catch (QueryException $e) {
-            Log::error('Error al eliminar el método de pago: ' . $e->getMessage());
-            
+        if (!$metodopago) {
             return redirect()->route('metodopagos.index')
-                ->withErrors('No se puede eliminar este método de pago porque está asociado a un pago registrado.');
+                ->with('error', 'Método de pago no encontrado.');
+        }
+
+        // Verificar si tiene pagos asociados
+        if ($metodopago->pagos()->exists()) {
+            return redirect()->route('metodopagos.index')
+                ->with('error', 'No se puede eliminar este método de pago porque está asociado a uno o más pagos.');
+        }
+
+        try {
+            $metodopago->delete();
+            return redirect()->route('metodopagos.index')
+                ->with('success', 'Método de pago eliminado correctamente.');
 
         } catch (Exception $e) {
-            Log::error('Error inesperado: ' . $e->getMessage());
-            
+            Log::error('Error al eliminar método de pago: ' . $e->getMessage());
             return redirect()->route('metodopagos.index')
-                ->withErrors('Ocurrió un error al intentar eliminar el método de pago.');
+                ->with('error', 'Ocurrió un error al intentar eliminar el método de pago.');
         }
     }
 
     public function cambioestado(Request $request)
     {
-        $metodopago = MetodoPago::find($request->id);
-        if ($metodopago) {
-            $metodopago->estado = $request->estado;
-            $metodopago->save();
-            return response()->json(['success' => true]);
+        $metodopago = Metodopago::find($request->id);
+
+        if (!$metodopago) {
+            return response()->json(['success' => false, 'message' => 'Método de pago no encontrado'], 404);
         }
-        return response()->json(['success' => false], 404);
+
+        $metodopago->estado = $request->estado;
+        $metodopago->save();
+
+        return response()->json(['success' => true]);
     }
 }

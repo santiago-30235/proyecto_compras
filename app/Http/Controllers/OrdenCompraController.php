@@ -2,24 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\OrdenCompra;
-use App\Models\DetalleCompra;
+use App\Models\Ordencompra;
+use App\Models\Detallecompra;
 use App\Models\Producto;
 use App\Models\Proveedor;
-use App\Models\MetodoPago;
+use App\Models\Metodopago;
 use App\Models\Pago;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use PDF;
-use Excel;
-use App\Exports\OrdenCompraExport;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\OrdencompraExport;
 use App\Exports\OrdenesComprasExport;
 use App\Exports\OrdenesExport;
 
-class OrdenCompraController extends Controller
+class OrdencompraController extends Controller
 {
     public function exportarExcel()
     {
@@ -28,7 +28,9 @@ class OrdenCompraController extends Controller
 
     public function index()
     {
-        $ordencompras = OrdenCompra::with('proveedor')->get();
+        $ordencompras = Ordencompra::with('proveedor')
+            ->orderBy('id', 'desc')
+            ->paginate(10);
         return view('ordencompras.index', compact('ordencompras'));
     }
 
@@ -36,13 +38,12 @@ class OrdenCompraController extends Controller
     {
         $proveedores = Proveedor::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
-        $metodosPago = MetodoPago::where('estado', '1')->get();
-        return view('ordencompras.create', compact('proveedores', 'productos', 'metodosPago'));
+        $metodospago = Metodopago::where('estado', '1')->get();
+        return view('ordencompras.create', compact('proveedores', 'productos', 'metodospago'));
     }
 
     public function store(Request $request)
     {
-        // 1. Validación estricta de entrada
         $request->validate([
             'proveedor_id'         => 'required|exists:proveedores,id',
             'fecha'                => 'required|date',
@@ -50,15 +51,11 @@ class OrdenCompraController extends Controller
             'productos'            => 'required|array|min:1',
             'productos.*.id'       => 'required|exists:productos,id',
             'productos.*.cantidad' => 'required|integer|min:1',
-            'numero_comprobante'   => 'nullable|string|max:150',
-            'observaciones'        => 'nullable|string|max:1000',
         ]);
 
-        // 2. Validación preventiva de Stock Máximo antes de tocar la BD
         foreach ($request->productos as $item) {
             $producto = Producto::find($item['id']);
             $nuevoStock = $producto->stock + $item['cantidad'];
-            
             if ($nuevoStock > $producto->stockmaximo) {
                 $disponible = $producto->stockmaximo - $producto->stock;
                 return redirect()->back()
@@ -67,15 +64,13 @@ class OrdenCompraController extends Controller
             }
         }
 
-        // 3. Activamos Transacción Atómica: O se guarda TODO o no se guarda NADA
         DB::beginTransaction();
 
         try {
-            $usuarioResponsable = auth()->check() ? auth()->user()->name : 'Sistema';
+            $usuarioResponsable = auth()->user()->name ?? 'Sistema';
             $total = 0;
 
-            // Crear cabecera de la orden
-            $orden = OrdenCompra::create([
+            $orden = Ordencompra::create([
                 'fecha'              => $request->fecha,
                 'proveedor_id'       => $request->proveedor_id,
                 'total'              => 0,
@@ -83,17 +78,14 @@ class OrdenCompraController extends Controller
                 'saldopendiente'     => 0,
                 'estado'             => '1',
                 'registradopor'      => $usuarioResponsable,
-                'numero_comprobante' => $request->numero_comprobante ?? null,
-                'observaciones'      => $request->observaciones ?? null,
             ]);
 
-            // Registrar detalles y actualizar inventario
             foreach ($request->productos as $item) {
                 $producto = Producto::find($item['id']);
                 $subtotal = $producto->preciocompra * $item['cantidad'];
                 $total += $subtotal;
 
-                DetalleCompra::create([
+                Detallecompra::create([
                     'ordencompra_id' => $orden->id,
                     'producto_id'    => $item['id'],
                     'cantidad'       => $item['cantidad'],
@@ -105,7 +97,6 @@ class OrdenCompraController extends Controller
                 $producto->save();
             }
 
-            // Procesamiento financiero según el tipo de pago
             if ($request->tipopago == 'contado') {
                 Pago::create([
                     'ordencompra_id' => $orden->id,
@@ -114,29 +105,19 @@ class OrdenCompraController extends Controller
                     'metodopago_id'  => $request->metodopago_id ?? 1,
                     'registradopor'  => $usuarioResponsable,
                 ]);
-                
                 $orden->update(['total' => $total, 'saldopendiente' => 0]);
                 $mensaje = 'Orden de compra creada y pagada correctamente.';
-                
             } else {
                 $abonoInicial = $request->abono_inicial ?? 0;
-                
-                if ($abonoInicial < 0) {
+
+                if ($abonoInicial < 0 || $abonoInicial > $total) {
                     DB::rollback();
-                    return back()->withErrors('El abono inicial no puede ser negativo.')->withInput();
+                    return back()->withErrors('El abono inicial no puede ser negativo ni mayor al total.')->withInput();
                 }
-                if ($abonoInicial > $total) {
-                    DB::rollback();
-                    return back()->withErrors('El abono inicial no puede ser mayor al total de la orden.')->withInput();
-                }
-                
+
                 $nuevoSaldo = $total - $abonoInicial;
-                
-                $orden->update([
-                    'total'          => $total,
-                    'saldopendiente' => $nuevoSaldo,
-                ]);
-                
+                $orden->update(['total' => $total, 'saldopendiente' => $nuevoSaldo]);
+
                 if ($abonoInicial > 0) {
                     Pago::create([
                         'ordencompra_id' => $orden->id,
@@ -146,152 +127,133 @@ class OrdenCompraController extends Controller
                         'registradopor'  => $usuarioResponsable,
                     ]);
                 }
-                
-                $mensaje = 'Orden de compra a crédito registrada correctamente. Saldo pendiente: $' . number_format($nuevoSaldo, 2);
+
+                $mensaje = 'Orden de compra a crédito registrada. Saldo pendiente: $' . number_format($nuevoSaldo, 2);
             }
 
-            // Si todo salió perfecto, consolidamos los cambios en PostgreSQL
             DB::commit();
-            return redirect()->route('ordencompras.index')->with('successMsg', $mensaje);
+            return redirect()->route('ordencompras.index')->with('success', $mensaje);
 
         } catch (Exception $e) {
-            // Si algo falló en Render, deshacemos todo para evitar inconsistencias
             DB::rollback();
-            Log::error('Error crítico al procesar orden de compra: ' . $e->getMessage());
+            Log::error('Error al registrar orden: ' . $e->getMessage());
             return redirect()->route('ordencompras.index')
-                ->withErrors('Ocurrió un error interno al intentar registrar la orden de compra.');
+                ->with('error', 'Ocurrió un error al registrar la orden.');
         }
     }
 
     public function show($id)
     {
-        $orden = OrdenCompra::with(['proveedor', 'detalles.producto', 'pagos'])->findOrFail($id);
+        $orden = Ordencompra::with(['proveedor', 'detalles.producto', 'pagos'])->findOrFail($id);
         return view('ordencompras.show', compact('orden'));
     }
 
     public function edit($id)
     {
-        $orden = OrdenCompra::findOrFail($id);
+        $orden = Ordencompra::findOrFail($id);
         $proveedores = Proveedor::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
-        $metodosPago = MetodoPago::where('estado', '1')->get();
-        return view('ordencompras.edit', compact('orden', 'proveedores', 'productos', 'metodosPago'));
+        $metodospago = Metodopago::where('estado', '1')->get();
+        return view('ordencompras.edit', compact('orden', 'proveedores', 'productos', 'metodospago'));
     }
 
     public function update(Request $request, $id)
     {
-        $orden = OrdenCompra::with('pagos')->findOrFail($id);
+        $orden = Ordencompra::findOrFail($id);
 
         $request->validate([
-            'proveedor_id'       => 'required|exists:proveedores,id',
-            'fecha'              => 'required|date',
-            'tipopago'           => 'required|in:contado,credito',
-            'metodopago_id'      => 'nullable|exists:metodopagos,id',
-            'numero_comprobante' => 'nullable|string|max:150',
-            'observaciones'      => 'nullable|string|max:1000',
+            'proveedor_id' => 'required|exists:proveedores,id',
+            'fecha'        => 'required|date',
+            'tipopago'     => 'required|in:contado,credito',
         ]);
 
         try {
             $orden->update([
-                'fecha'              => $request->fecha,
-                'proveedor_id'       => $request->proveedor_id,
-                'tipopago'           => $request->tipopago,
-                'numero_comprobante' => $request->numero_comprobante ?? null,
-                'observaciones'      => $request->observaciones ?? null,
-                'registradopor'      => auth()->check() ? auth()->user()->name : 'Sistema',
+                'fecha'        => $request->fecha,
+                'proveedor_id' => $request->proveedor_id,
+                'tipopago'     => $request->tipopago,
+                // 'registradopor' no se actualiza (es histórico)
+                // 'estado' no se actualiza aquí (se maneja con toggle)
             ]);
 
-            if ($request->filled('metodopago_id')) {
-                $primerPago = $orden->pagos()->orderBy('id')->first();
-                if ($primerPago) {
-                    $primerPago->update(['metodopago_id' => $request->metodopago_id]);
-                }
-            }
-
             return redirect()->route('ordencompras.index')
-                ->with('successMsg', 'Orden de compra actualizada correctamente.');
+                ->with('success', 'Orden actualizada correctamente.');
 
         } catch (Exception $e) {
-            Log::error('Error al actualizar orden de compra: ' . $e->getMessage());
+            Log::error('Error al actualizar orden: ' . $e->getMessage());
             return redirect()->route('ordencompras.index')
-                ->withErrors('Ocurrió un error al intentar actualizar la orden de compra.');
+                ->with('error', 'Ocurrió un error al actualizar la orden.');
         }
     }
 
     public function destroy($id)
     {
-        $orden = OrdenCompra::findOrFail($id);
+        $orden = Ordencompra::find($id);
 
-        // Control de deudas antes de permitir la eliminación
-        $totalPagado = DB::table('pagos')->where('ordencompra_id', $id)->sum('monto');
-        $saldoPendiente = $orden->total - $totalPagado;
-
-        if ($saldoPendiente > 0) {
+        if (!$orden) {
             return redirect()->route('ordencompras.index')
-                ->withErrors('Esta orden de compra no se puede eliminar porque presenta un saldo activo pendiente con el proveedor.');
+                ->with('error', 'Orden no encontrada.');
+        }
+
+        if ($orden->saldopendiente > 0) {
+            return redirect()->route('ordencompras.index')
+                ->with('error', 'No se puede eliminar la orden porque tiene saldo pendiente.');
         }
 
         DB::beginTransaction();
 
         try {
-            // Reversión del stock adquirido
             foreach ($orden->detalles as $detalle) {
                 $producto = $detalle->producto;
                 if ($producto) {
                     $producto->stock -= $detalle->cantidad;
-                    if ($producto->stock < 0) {
-                        $producto->stock = 0;
-                    }
+                    if ($producto->stock < 0) $producto->stock = 0;
                     $producto->save();
                 }
             }
 
-            // Limpieza segura en cascada para PostgreSQL
             $orden->detalles()->delete();
-
-            if (method_exists($orden, 'pagos')) {
-                $orden->pagos()->delete();
-            } else {
-                DB::table('pagos')->where('ordencompra_id', $id)->delete();
-            }
-
+            $orden->pagos()->delete();
             $orden->delete();
 
-            DB::commit(); 
+            DB::commit();
             return redirect()->route('ordencompras.index')
-                ->with('successMsg', 'Orden de compra eliminada correctamente y stock revertido.');
+                ->with('success', 'Orden eliminada correctamente y stock revertido.');
 
         } catch (Exception $e) {
-            DB::rollback(); 
-            Log::error('Error al eliminar orden de compra: ' . $e->getMessage());
+            DB::rollback();
+            Log::error('Error al eliminar orden: ' . $e->getMessage());
             return redirect()->route('ordencompras.index')
-                ->withErrors('Ocurrió un error inesperado al intentar eliminar la orden de compra.');
+                ->with('error', 'Ocurrió un error al eliminar la orden.');
         }
     }
 
     public function cambioestado(Request $request)
     {
-        $orden = OrdenCompra::find($request->id);
-        if ($orden) {
-            $orden->estado = $request->estado;
-            $orden->save();
-            return response()->json(['success' => true]);
+        $orden = Ordencompra::find($request->id);
+
+        if (!$orden) {
+            return response()->json(['success' => false, 'message' => 'Orden no encontrada'], 404);
         }
-        return response()->json(['success' => false], 404);
+
+        $orden->estado = $request->estado;
+        $orden->save();
+
+        return response()->json(['success' => true]);
     }
 
     public function generarPDF($id)
     {
-        $orden = OrdenCompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
+        $orden = Ordencompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
         $data = ['orden' => $orden, 'fecha' => now()->format('d/m/Y H:i')];
-        $pdf = PDF::loadView('ordencompras.pdf', $data)->setPaper('a4', 'portrait');
+        $pdf = Pdf::loadView('ordencompras.pdf', $data)->setPaper('a4', 'portrait');
         return $pdf->stream('orden-compra-' . $orden->id . '.pdf');
     }
 
     public function generarExcel($id)
     {
-        $orden = OrdenCompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
-        return Excel::download(new OrdenCompraExport($orden), 'orden-compra-' . $id . '.xlsx');
+        $orden = Ordencompra::with(['proveedor', 'detalles.producto'])->findOrFail($id);
+        return Excel::download(new OrdencompraExport($orden), 'orden-compra-' . $id . '.xlsx');
     }
 
     public function generarExcelGeneral()
