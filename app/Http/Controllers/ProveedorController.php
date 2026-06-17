@@ -13,7 +13,7 @@ class ProveedorController extends Controller
 {
     public function index()
     {
-        $proveedores = Proveedor::all();
+        $proveedores = Proveedor::orderBy('nombre')->paginate(10);
         return view('proveedores.index', compact('proveedores'));
     }
 
@@ -24,13 +24,12 @@ class ProveedorController extends Controller
 
     public function store(Request $request)
     {
-        // 1. Validaciones: Se incluye la dirección obligatoria exigida por PostgreSQL
         $request->validate([
-            'nombre'    => 'required|unique:proveedores,nombre',
-            'documento' => 'required|unique:proveedores,documento',
-            'direccion' => 'required',
-            'telefono'  => 'required',
-            'email'     => 'required|email|unique:proveedores,email',
+            'nombre'    => 'required|string|max:255|unique:proveedores,nombre',
+            'documento' => 'required|string|max:50|unique:proveedores,documento',
+            'direccion' => 'nullable|string|max:255',
+            'telefono'  => 'required|string|max:20',
+            'email'     => 'required|email|max:255|unique:proveedores,email',
         ]);
 
         try {
@@ -45,12 +44,12 @@ class ProveedorController extends Controller
             ]);
 
             return redirect()->route('proveedores.index')
-                ->with('successMsg', 'Proveedor registrado correctamente.');
+                ->with('success', 'Proveedor registrado correctamente.');
 
         } catch (Exception $e) {
             Log::error('Error al guardar proveedor: ' . $e->getMessage());
             return redirect()->route('proveedores.index')
-                ->withErrors('Ocurrió un error al intentar guardar el proveedor.');
+                ->with('error', 'Ocurrió un error al intentar guardar el proveedor.');
         }
     }
 
@@ -68,77 +67,73 @@ class ProveedorController extends Controller
 
     public function update(Request $request, $id)
     {
-        // 1. Validaciones para actualización (protegiendo también la dirección)
         $request->validate([
-            'nombre'    => 'required|unique:proveedores,nombre,' . $id,
-            'documento' => 'required|unique:proveedores,documento,' . $id,
-            'direccion' => 'required',
-            'telefono'  => 'required',
-            'email'     => 'required|email|unique:proveedores,email,' . $id,
+            'nombre'    => 'required|string|max:255|unique:proveedores,nombre,' . $id,
+            'documento' => 'required|string|max:50|unique:proveedores,documento,' . $id,
+            'direccion' => 'nullable|string|max:255',
+            'telefono'  => 'required|string|max:20',
+            'email'     => 'required|email|max:255|unique:proveedores,email,' . $id,
         ]);
 
         try {
             $proveedor = Proveedor::findOrFail($id);
-
             $proveedor->update([
-                'nombre'        => $request->nombre,
-                'documento'     => $request->documento,
-                'direccion'     => $request->direccion,
-                'telefono'      => $request->telefono,
-                'email'         => $request->email,
-                'registradopor' => auth()->check() ? auth()->user()->name : 'Sistema',
+                'nombre'    => $request->nombre,
+                'documento' => $request->documento,
+                'direccion' => $request->direccion,
+                'telefono'  => $request->telefono,
+                'email'     => $request->email,
+                // 'estado' no se actualiza aquí (se maneja con toggle)
+                // 'registradopor' no se actualiza aquí (es histórico)
             ]);
 
             return redirect()->route('proveedores.index')
-                ->with('successMsg', 'Proveedor actualizado correctamente.');
+                ->with('success', 'Proveedor actualizado correctamente.');
 
         } catch (Exception $e) {
             Log::error('Error al actualizar proveedor: ' . $e->getMessage());
             return redirect()->route('proveedores.index')
-                ->withErrors('Ocurrió un error al intentar actualizar el proveedor.');
+                ->with('error', 'Ocurrió un error al intentar actualizar el proveedor.');
         }
     }
 
     public function destroy($id)
     {
-        $proveedor = Proveedor::findOrFail($id);
+        $proveedor = Proveedor::find($id);
 
-        // Candado de seguridad: Verificar si tiene órdenes de compra asociadas
-        $tieneOrdenes = false;
-        if (method_exists($proveedor, 'ordencompras')) {
-            $tieneOrdenes = $proveedor->ordencompras()->exists();
-        } elseif (method_exists($proveedor, 'ordenes')) {
-            $tieneOrdenes = $proveedor->ordenes()->exists();
-        } else {
-            // Plan B de consulta directa por si acaso en Render
-            $tieneOrdenes = DB::table('ordencompras')->where('proveedor_id', $id)->exists() 
-                         || DB::table('orden_compras')->where('proveedor_id', $id)->exists();
+        if (!$proveedor) {
+            return redirect()->route('proveedores.index')
+                ->with('error', 'Proveedor no encontrado.');
         }
 
-        if ($tieneOrdenes) {
+        // Verificar si tiene órdenes de compra asociadas
+        if ($proveedor->ordencompras()->exists()) {
             return redirect()->route('proveedores.index')
-                ->withErrors('No se puede eliminar este proveedor porque tiene órdenes de compra asociadas.');
+                ->with('error', 'No se puede eliminar este proveedor porque tiene órdenes de compra asociadas.');
         }
 
         try {
             $proveedor->delete();
             return redirect()->route('proveedores.index')
-                ->with('successMsg', 'Proveedor eliminado correctamente.');
+                ->with('success', 'Proveedor eliminado correctamente.');
         } catch (Exception $e) {
             Log::error('Error al eliminar proveedor: ' . $e->getMessage());
             return redirect()->route('proveedores.index')
-                ->withErrors('Ocurrió un error al intentar eliminar el proveedor.');
+                ->with('error', 'Ocurrió un error al intentar eliminar el proveedor.');
         }
     }
 
     public function cambioestado(Request $request)
     {
         $proveedor = Proveedor::find($request->id);
-        if ($proveedor) {
-            $proveedor->estado = $request->estado;
-            $proveedor->save();
-            return response()->json(['success' => true]);
+
+        if (!$proveedor) {
+            return response()->json(['success' => false, 'message' => 'Proveedor no encontrado'], 404);
         }
-        return response()->json(['success' => false], 404);
+
+        $proveedor->estado = $request->estado;
+        $proveedor->save();
+
+        return response()->json(['success' => true]);
     }
 }
