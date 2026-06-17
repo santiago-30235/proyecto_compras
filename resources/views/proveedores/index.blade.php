@@ -81,13 +81,13 @@
                                                 <a href="{{ route('proveedores.edit', $proveedor->id) }}" class="btn btn-primary" title="Editar">
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
-                                                <form class="d-inline delete-form" action="{{ route('proveedores.destroy', $proveedor->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger" title="Eliminar">
-                                                        <i class="fas fa-trash-alt"></i>
-                                                    </button>
-                                                </form>
+                                                <button type="button" 
+                                                        class="btn btn-danger btn-eliminar-proveedor" 
+                                                        data-id="{{ $proveedor->id }}"
+                                                        data-nombre="{{ $proveedor->nombre }}"
+                                                        title="Eliminar">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -102,4 +102,86 @@
     </section>
 </div>
 
+<!-- Modal de Confirmación -->
+<div class="modal fade" id="modalEliminarProveedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">¿Está seguro?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Esta acción no se puede deshacer.</p>
+                <p class="text-muted" id="nombreProveedorAEliminar"></p>
+                <div id="mensajeErrorEliminar" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarEliminar">Sí, eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modalEliminar = new bootstrap.Modal(document.getElementById('modalEliminarProveedor'));
+    let proveedorId = null;
+
+    document.querySelectorAll('.btn-eliminar-proveedor').forEach(button => {
+        button.addEventListener('click', function() {
+            proveedorId = this.dataset.id;
+            document.getElementById('nombreProveedorAEliminar').innerHTML = 
+                'Proveedor: <strong>' + this.dataset.nombre + '</strong>';
+            document.getElementById('mensajeErrorEliminar').classList.add('d-none');
+            modalEliminar.show();
+        });
+    });
+
+    document.getElementById('btnConfirmarEliminar').addEventListener('click', function() {
+        const btn = this;
+        const mensajeError = document.getElementById('mensajeErrorEliminar');
+        
+        btn.disabled = true;
+        btn.innerHTML = 'Eliminando...';
+
+        fetch('/proveedores/' + proveedorId, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                modalEliminar.hide();
+                location.reload();
+            } else {
+                mensajeError.classList.remove('d-none');
+                mensajeError.textContent = data.message;
+                btn.disabled = false;
+                btn.innerHTML = 'Sí, eliminar';
+            }
+        })
+        .catch(error => {
+            mensajeError.classList.remove('d-none');
+            mensajeError.textContent = 'Error al procesar la solicitud.';
+            btn.disabled = false;
+            btn.innerHTML = 'Sí, eliminar';
+        });
+    });
+
+    document.getElementById('modalEliminarProveedor').addEventListener('hidden.bs.modal', function() {
+        const btn = document.getElementById('btnConfirmarEliminar');
+        btn.disabled = false;
+        btn.innerHTML = 'Sí, eliminar';
+        document.getElementById('mensajeErrorEliminar').classList.add('d-none');
+    });
+});
+</script>
+@endpush
