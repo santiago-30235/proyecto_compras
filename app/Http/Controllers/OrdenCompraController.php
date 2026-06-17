@@ -211,47 +211,52 @@ class OrdenCompraController extends Controller
     }
 
     public function destroy($id)
-    {
-        $orden = OrdenCompra::find($id);
+{
+    $orden = OrdenCompra::find($id);
 
-        if (!$orden) {
-            return redirect()->route('ordencompras.index')
-                ->with('error', 'Orden no encontrada.');
-        }
-
-        if ($orden->saldopendiente > 0) {
-            return redirect()->route('ordencompras.index')
-                ->with('error', 'No se puede eliminar la orden porque tiene saldo pendiente.');
-        }
-
-        DB::beginTransaction();
-
-        try {
-            foreach ($orden->detalles as $detalle) {
-                $producto = $detalle->producto;
-                if ($producto) {
-                    $producto->stock -= $detalle->cantidad;
-                    if ($producto->stock < 0) $producto->stock = 0;
-                    $producto->save();
-                }
-            }
-
-            $orden->detalles()->delete();
-            $orden->pagos()->delete();
-            $orden->delete();
-
-            DB::commit();
-            return redirect()->route('ordencompras.index')
-                ->with('success', 'Orden eliminada correctamente y stock revertido.');
-
-        } catch (Exception $e) {
-            DB::rollback();
-            Log::error('Error al eliminar orden: ' . $e->getMessage());
-            return redirect()->route('ordencompras.index')
-                ->with('error', 'Ocurrió un error al eliminar la orden.');
-        }
+    if (!$orden) {
+        return redirect()->route('ordencompras.index')
+            ->with('error', 'Orden no encontrada.');
     }
 
+    //  VALIDAR SI TIENE SALDO PENDIENTE
+    if ($orden->saldopendiente > 0) {
+        return redirect()->route('ordencompras.index')
+            ->with('error', 'No se puede eliminar la orden #' . $orden->id . ' porque tiene un saldo pendiente de $' . number_format($orden->saldopendiente, 2) . '.');
+    }
+
+    DB::beginTransaction();
+
+    try {
+        //  REVERTIR STOCK DE LOS PRODUCTOS
+        foreach ($orden->detalles as $detalle) {
+            $producto = $detalle->producto;
+            if ($producto) {
+                $producto->stock -= $detalle->cantidad;
+                if ($producto->stock < 0) $producto->stock = 0;
+                $producto->save();
+            }
+        }
+
+        //  ELIMINAR RELACIONES Y LA ORDEN
+        $ordenId = $orden->id;
+        $orden->detalles()->delete();
+        $orden->pagos()->delete();
+        $orden->delete();
+
+        DB::commit();
+        
+        return redirect()->route('ordencompras.index')
+            ->with('success', 'Orden #' . $ordenId . ' eliminada correctamente y stock revertido.');
+
+    } catch (Exception $e) {
+        DB::rollback();
+        Log::error('Error al eliminar orden: ' . $e->getMessage());
+        
+        return redirect()->route('ordencompras.index')
+            ->with('error', 'Ocurrió un error al eliminar la orden.');
+    }
+}
     /**
      * Cambia el estado de una orden de compra (Activo/Inactivo)
      */

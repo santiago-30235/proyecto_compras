@@ -173,38 +173,18 @@ class PagoController extends Controller
      * Remove the specified resource from storage.
      */
     public function destroy($id)
-    {
-        $pago = Pago::find($id);
+{
+    $pago = Pago::find($id);
 
-        if (!$pago) {
-            session()->flash('error', 'Pago no encontrado.');
-            return redirect()->route('pagos.index');
-        }
-
-        $ordenesAsociadas = $pago->ordenCompra ? 1 : 0;
-
-        if ($ordenesAsociadas > 0) {
-            session()->flash('error', 'No se puede eliminar este pago porque tiene ' . $ordenesAsociadas . ' órdenes de compra asociadas.');
-            return redirect()->route('pagos.index');
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $pago->delete();
-
-            DB::commit();
-            session()->flash('success', 'Pago eliminado correctamente.');
-            return redirect()->route('pagos.index');
-
-        } catch (Exception $e) {
-            DB::rollback();
-            Log::error('Error al eliminar pago: ' . $e->getMessage());
-            session()->flash('error', 'Ocurrió un error al intentar eliminar el pago.');
-            return redirect()->route('pagos.index');
-        }
+    if (!$pago) {
+        return redirect()->route('pagos.index')
+            ->with('error', 'Pago no encontrado.');
     }
 
+    //  LOS PAGOS NO SE PUEDEN ELIMINAR
+    return redirect()->route('pagos.index')
+        ->with('error', 'No se puede eliminar el pago #' . $pago->id . '. Los pagos no se eliminan por seguridad.');
+}
     /**
      * Cambia el estado de un pago (Activo/Inactivo)
      */

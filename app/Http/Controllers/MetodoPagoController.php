@@ -86,32 +86,36 @@ class MetodoPagoController extends Controller
     }
 
     public function destroy($id)
-    {
-        $metodopago = MetodoPago::find($id);
+{
+    $metodopago = MetodoPago::find($id);
 
-        if (!$metodopago) {
-            session()->flash('error', 'Método de pago no encontrado.');
-            return redirect()->route('metodopagos.index');
-        }
-
-        $comprasAsociadas = $metodopago->pagos()->count();
-
-        if ($comprasAsociadas > 0) {
-            session()->flash('error', 'No se puede eliminar este método de pago porque tiene ' . $comprasAsociadas . ' compras asociadas.');
-            return redirect()->route('metodopagos.index');
-        }
-
-        try {
-            $metodopago->delete();
-            session()->flash('success', 'Método de pago eliminado correctamente.');
-            return redirect()->route('metodopagos.index');
-
-        } catch (Exception $e) {
-            Log::error('Error al eliminar método de pago: ' . $e->getMessage());
-            session()->flash('error', 'Ocurrió un error al intentar eliminar el método de pago.');
-            return redirect()->route('metodopagos.index');
-        }
+    if (!$metodopago) {
+        return redirect()->route('metodopagos.index')
+            ->with('error', 'Método de pago no encontrado.');
     }
+
+    //  VALIDAR SI TIENE PAGOS ASOCIADOS
+    $pagosAsociados = $metodopago->pagos()->count();
+
+    if ($pagosAsociados > 0) {
+        return redirect()->route('metodopagos.index')
+            ->with('error', 'No se puede eliminar el método de pago "' . $metodopago->nombre . '" porque tiene ' . $pagosAsociados . ' pagos asociados.');
+    }
+
+    try {
+        $nombre = $metodopago->nombre;
+        $metodopago->delete();
+
+        return redirect()->route('metodopagos.index')
+            ->with('success', 'Método de pago "' . $nombre . '" eliminado correctamente.');
+
+    } catch (Exception $e) {
+        Log::error('Error al eliminar método de pago: ' . $e->getMessage());
+        
+        return redirect()->route('metodopagos.index')
+            ->with('error', 'Ocurrió un error al intentar eliminar el método de pago.');
+    }
+}
 
     public function cambioestado(Request $request)
     {

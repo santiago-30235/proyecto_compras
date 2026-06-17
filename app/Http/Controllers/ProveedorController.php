@@ -99,39 +99,61 @@ class ProveedorController extends Controller
     }
 
     public function destroy($id)
-    {
-        $proveedor = Proveedor::find($id);
+{
+    $proveedor = Proveedor::find($id);
 
-        if (!$proveedor) {
-            session()->flash('error', 'Proveedor no encontrado.');
-            return redirect()->route('proveedores.index');
-        }
-
-        $ordenesCompras = $proveedor->ordenCompras()->count();
-        $ordenCompraIds = $proveedor->ordenCompras()->pluck('id');
-        $productosAsociados = 0;
-
-        if ($ordenCompraIds->isNotEmpty()) {
-            $productosAsociados = DetalleCompra::whereIn('ordencompra_id', $ordenCompraIds)
-                ->distinct()
-                ->count('producto_id');
-        }
-
-        if ($ordenesCompras > 0 || $productosAsociados > 0) {
-            session()->flash('error', 'No se puede eliminar este proveedor porque tiene ' . $ordenesCompras . ' órdenes de compra asociadas y ' . $productosAsociados . ' productos asociados.');
-            return redirect()->route('proveedores.index');
-        }
-
-        try {
-            $proveedor->delete();
-            session()->flash('success', 'Proveedor eliminado correctamente.');
-            return redirect()->route('proveedores.index');
-        } catch (Exception $e) {
-            Log::error('Error al eliminar proveedor: ' . $e->getMessage());
-            session()->flash('error', 'Ocurrió un error al intentar eliminar el proveedor.');
-            return redirect()->route('proveedores.index');
-        }
+    if (!$proveedor) {
+        return redirect()->route('proveedores.index')
+            ->with('error', 'Proveedor no encontrado.');
     }
+
+    //  CONTAR RELACIONES
+    $ordenesCompras = $proveedor->ordenCompras()->count();
+    $ordenCompraIds = $proveedor->ordenCompras()->pluck('id');
+    $productosAsociados = 0;
+
+    if ($ordenCompraIds->isNotEmpty()) {
+        $productosAsociados = DetalleCompra::whereIn('ordencompra_id', $ordenCompraIds)
+            ->distinct()
+            ->count('producto_id');
+    }
+
+    //  SI TIENE RELACIONES, NO SE PUEDE ELIMINAR
+    if ($ordenesCompras > 0 || $productosAsociados > 0) {
+        $mensaje = 'No se puede eliminar el proveedor "' . $proveedor->nombre . '" porque tiene:';
+        
+        if ($ordenesCompras > 0) {
+            $mensaje .= ' ' . $ordenesCompras . ' órdenes de compra asociadas';
+        }
+        
+        if ($productosAsociados > 0) {
+            if ($ordenesCompras > 0) {
+                $mensaje .= ' y';
+            }
+            $mensaje .= ' ' . $productosAsociados . ' productos asociados';
+        }
+        
+        $mensaje .= '.';
+        
+        return redirect()->route('proveedores.index')
+            ->with('error', $mensaje);
+    }
+
+    //  SI SE PUEDE ELIMINAR
+    try {
+        $nombre = $proveedor->nombre;
+        $proveedor->delete();
+        
+        return redirect()->route('proveedores.index')
+            ->with('success', 'Proveedor "' . $nombre . '" eliminado correctamente.');
+
+    } catch (Exception $e) {
+        Log::error('Error al eliminar proveedor: ' . $e->getMessage());
+        
+        return redirect()->route('proveedores.index')
+            ->with('error', 'Ocurrió un error al intentar eliminar el proveedor.');
+    }
+}
 
     public function cambioestado(Request $request)
     {

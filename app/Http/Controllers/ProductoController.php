@@ -133,38 +133,41 @@ class ProductoController extends Controller
     }
 
     public function destroy($id)
-    {
-        $producto = Producto::find($id);
+{
+    $producto = Producto::find($id);
 
-        if (!$producto) {
-            session()->flash('error', 'Producto no encontrado.');
-            return redirect()->route('productos.index');
-        }
-
-        $detallesOrdenCompra = $producto->detallesCompras()->count();
-
-        if ($detallesOrdenCompra > 0) {
-            session()->flash('error', 'No se puede eliminar este producto porque tiene ' . $detallesOrdenCompra . ' detalles de órdenes de compra asociados.');
-            return redirect()->route('productos.index');
-        }
-
-        try {
-            // Eliminar imagen si no es la por defecto
-            if ($producto->imagen && $producto->imagen !== 'sin-imagen.png' && file_exists(public_path($producto->imagen))) {
-                unlink(public_path($producto->imagen));
-            }
-
-            $producto->delete();
-
-            session()->flash('success', 'Producto eliminado correctamente.');
-            return redirect()->route('productos.index');
-
-        } catch (Exception $e) {
-            Log::error('Error al eliminar producto: ' . $e->getMessage());
-            session()->flash('error', 'Ocurrió un error al intentar eliminar el producto.');
-            return redirect()->route('productos.index');
-        }
+    if (!$producto) {
+        return redirect()->route('productos.index')
+            ->with('error', 'Producto no encontrado.');
     }
+
+    //  VALIDAR SI TIENE DETALLES DE COMPRA ASOCIADOS
+    $detallesOrdenCompra = $producto->detallesCompras()->count();
+
+    if ($detallesOrdenCompra > 0) {
+        return redirect()->route('productos.index')
+            ->with('error', 'No se puede eliminar el producto "' . $producto->nombre . '" porque tiene ' . $detallesOrdenCompra . ' detalles de órdenes de compra asociados.');
+    }
+
+    try {
+        //  ELIMINAR IMAGEN SI NO ES LA POR DEFECTO
+        if ($producto->imagen && $producto->imagen !== 'sin-imagen.png' && file_exists(public_path($producto->imagen))) {
+            unlink(public_path($producto->imagen));
+        }
+
+        $nombre = $producto->nombre;
+        $producto->delete();
+
+        return redirect()->route('productos.index')
+            ->with('success', 'Producto "' . $nombre . '" eliminado correctamente.');
+
+    } catch (Exception $e) {
+        Log::error('Error al eliminar producto: ' . $e->getMessage());
+        
+        return redirect()->route('productos.index')
+            ->with('error', 'Ocurrió un error al intentar eliminar el producto.');
+    }
+}
 
     public function cambioestado(Request $request)
     {
