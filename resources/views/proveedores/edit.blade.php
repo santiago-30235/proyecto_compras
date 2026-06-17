@@ -53,8 +53,9 @@
                                         </div>
                                     </div>
                                 </div>
+                                <!-- DIRECCIÓN: AHORA OCUPA SOLO LA MITAD (col-lg-6) -->
                                 <div class="row">
-                                    <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12">
+                                    <div class="col-lg-6 col-sm-6 col-md-6 col-xs-12">
                                         <div class="form-group label-floating">
                                             <label class="control-label">Dirección</label>
                                             <input type="text" class="form-control" name="direccion" placeholder="Dirección" autocomplete="off" value="{{ $proveedor->direccion }}">

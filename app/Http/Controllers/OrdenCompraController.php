@@ -28,46 +28,38 @@ class OrdenCompraController extends Controller
     /**
      * Muestra el listado de órdenes de compra con paginación dinámica y búsqueda
      */
-    public function index(Request $request)
+ public function index(Request $request)
 {
-    // 1. Obtener el número de registros por página (por defecto 10)
-    $perPage = $request->input('per_page', 10);
+    // 1. Construir la consulta base con JOIN para ordenar por nombre
+    $query = OrdenCompra::with('proveedor')
+        ->join('proveedores', 'ordencompras.proveedor_id', '=', 'proveedores.id')
+        ->select('ordencompras.*');
     
-    // 2. Obtener el término de búsqueda
+    // 2. Aplicar búsqueda si existe
     $search = $request->input('search');
-    
-    // 3. Construir la consulta base
-    $query = OrdenCompra::with('proveedor');
-    
-    // 4. Aplicar búsqueda si existe
     if ($search) {
         $query->where(function($q) use ($search) {
-            $q->where('id', 'LIKE', "%{$search}%")
-              ->orWhere('fecha', 'LIKE', "%{$search}%")
-              ->orWhere('total', 'LIKE', "%{$search}%")
-              ->orWhere('tipopago', 'LIKE', "%{$search}%")
-              ->orWhere('estado', 'LIKE', "%{$search}%")
-              ->orWhere('saldopendiente', 'LIKE', "%{$search}%")
-              ->orWhere('registradopor', 'LIKE', "%{$search}%")
-              ->orWhereHas('proveedor', function($q2) use ($search) {
-                  $q2->where('nombre', 'LIKE', "%{$search}%")
-                     ->orWhere('razonsocial', 'LIKE', "%{$search}%")
-                     ->orWhere('email', 'LIKE', "%{$search}%")
-                     ->orWhere('telefono', 'LIKE', "%{$search}%");
-              });
+            $q->where('ordencompras.id', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.fecha', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.total', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.tipopago', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.estado', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.saldopendiente', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.registradopor', 'LIKE', "%{$search}%")
+              ->orWhere('proveedores.nombre', 'LIKE', "%{$search}%")
+              ->orWhere('proveedores.razonsocial', 'LIKE', "%{$search}%")
+              ->orWhere('proveedores.email', 'LIKE', "%{$search}%")
+              ->orWhere('proveedores.telefono', 'LIKE', "%{$search}%");
         });
     }
     
-    // 5. Ejecutar la consulta con paginación ORDENADO POR NOMBRE DEL PROVEEDOR
-    $ordencompras = $query->orderBy('proveedor_id', 'asc')->paginate($perPage);
+    // 3. ORDENAR ALFABÉTICAMENTE POR NOMBRE DEL PROVEEDOR
+    // 4. get() en lugar de paginate() para que DataTables maneje la paginación
+    $ordencompras = $query->orderBy('proveedores.nombre', 'asc')->get();
     
-    // 6. Mantener los parámetros en los links de paginación
-    $ordencompras->appends($request->all());
-    
-    // 7. Retornar la vista
+    // 5. Retornar la vista
     return view('ordencompras.index', compact('ordencompras'));
 }
-
     public function create()
     {
         $proveedores = Proveedor::where('estado', '1')->get();

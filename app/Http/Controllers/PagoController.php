@@ -17,44 +17,34 @@ class PagoController extends Controller
      * Display a listing of the resource with dynamic pagination and search.
      */
     public function index(Request $request)
-    {
-        // 1. Obtener el número de registros por página (por defecto 10)
-        $perPage = $request->input('per_page', 10);
-        
-        // 2. Obtener el término de búsqueda
-        $search = $request->input('search');
-        
-        // 3. Construir la consulta base
-        $query = Pago::with(['ordenCompra', 'metodoPago']);
-        
-        // 4. Aplicar búsqueda si existe
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('id', 'LIKE', "%{$search}%")
-                  ->orWhere('fechapago', 'LIKE', "%{$search}%")
-                  ->orWhere('monto', 'LIKE', "%{$search}%")
-                  ->orWhere('registradopor', 'LIKE', "%{$search}%")
-                  ->orWhereHas('ordenCompra', function($q2) use ($search) {
-                      $q2->where('id', 'LIKE', "%{$search}%")
-                         ->orWhere('total', 'LIKE', "%{$search}%")
-                         ->orWhere('tipopago', 'LIKE', "%{$search}%");
-                  })
-                  ->orWhereHas('metodoPago', function($q3) use ($search) {
-                      $q3->where('nombre', 'LIKE', "%{$search}%");
-                  });
-            });
-        }
-        
-        // 5. Ejecutar la consulta con paginación
-        $pagos = $query->orderBy('id', 'desc')->paginate($perPage);
-        
-        // 6. Mantener los parámetros en los links de paginación
-        $pagos->appends($request->all());
-        
-        // 7. Retornar la vista
-        return view('pagos.index', compact('pagos'));
+{
+    // 1. Construir la consulta base con JOIN para ordenar por nombre del proveedor
+    $query = Pago::with(['ordenCompra', 'ordenCompra.proveedor', 'metodoPago'])
+        ->join('ordencompras', 'pagos.ordencompra_id', '=', 'ordencompras.id')
+        ->join('proveedores', 'ordencompras.proveedor_id', '=', 'proveedores.id')
+        ->select('pagos.*');
+    
+    // 2. Aplicar búsqueda si existe
+    $search = $request->input('search');
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            $q->where('pagos.id', 'LIKE', "%{$search}%")
+              ->orWhere('pagos.fechapago', 'LIKE', "%{$search}%")
+              ->orWhere('pagos.monto', 'LIKE', "%{$search}%")
+              ->orWhere('pagos.registradopor', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.id', 'LIKE', "%{$search}%")
+              ->orWhere('ordencompras.total', 'LIKE', "%{$search}%")
+              ->orWhere('proveedores.nombre', 'LIKE', "%{$search}%");
+        });
     }
-
+    
+    // 3. ORDENAR ALFABÉTICAMENTE POR NOMBRE DEL PROVEEDOR
+    // 4. get() en lugar de paginate() para que DataTables maneje la paginación
+    $pagos = $query->orderBy('proveedores.nombre', 'asc')->get();
+    
+    // 5. Retornar la vista
+    return view('pagos.index', compact('pagos'));
+}
     /**
      * Show the form for creating a new resource.
      */
