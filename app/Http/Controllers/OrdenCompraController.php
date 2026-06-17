@@ -25,11 +25,46 @@ class OrdenCompraController extends Controller
         return Excel::download(new OrdenesExport(), 'ordenes-compras.xlsx');
     }
 
-    public function index()
+    /**
+     * Muestra el listado de órdenes de compra con paginación dinámica y búsqueda
+     */
+    public function index(Request $request)
     {
-        $ordencompras = OrdenCompra::with('proveedor')
-            ->orderBy('id', 'desc')
-            ->paginate(10);
+        // 1. Obtener el número de registros por página (por defecto 10)
+        $perPage = $request->input('per_page', 10);
+        
+        // 2. Obtener el término de búsqueda
+        $search = $request->input('search');
+        
+        // 3. Construir la consulta base
+        $query = OrdenCompra::with('proveedor');
+        
+        // 4. Aplicar búsqueda si existe
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('id', 'LIKE', "%{$search}%")
+                  ->orWhere('fecha', 'LIKE', "%{$search}%")
+                  ->orWhere('total', 'LIKE', "%{$search}%")
+                  ->orWhere('tipopago', 'LIKE', "%{$search}%")
+                  ->orWhere('estado', 'LIKE', "%{$search}%")
+                  ->orWhere('saldopendiente', 'LIKE', "%{$search}%")
+                  ->orWhere('registradopor', 'LIKE', "%{$search}%")
+                  ->orWhereHas('proveedor', function($q2) use ($search) {
+                      $q2->where('nombre', 'LIKE', "%{$search}%")
+                         ->orWhere('razonsocial', 'LIKE', "%{$search}%")
+                         ->orWhere('email', 'LIKE', "%{$search}%")
+                         ->orWhere('telefono', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+        
+        // 5. Ejecutar la consulta con paginación
+        $ordencompras = $query->orderBy('id', 'desc')->paginate($perPage);
+        
+        // 6. Mantener los parámetros en los links de paginación
+        $ordencompras->appends($request->all());
+        
+        // 7. Retornar la vista
         return view('ordencompras.index', compact('ordencompras'));
     }
 
@@ -171,8 +206,6 @@ class OrdenCompraController extends Controller
                 'fecha'        => $request->fecha,
                 'proveedor_id' => $request->proveedor_id,
                 'tipopago'     => $request->tipopago,
-                // 'registradopor' no se actualiza (es histórico)
-                // 'estado' no se actualiza aquí (se maneja con toggle)
             ]);
 
             return redirect()->route('ordencompras.index')
