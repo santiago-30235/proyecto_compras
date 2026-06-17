@@ -260,6 +260,9 @@ class OrdenCompraController extends Controller
         }
     }
 
+    /**
+     * Cambia el estado de una orden de compra (Activo/Inactivo)
+     */
     public function cambioestado(Request $request)
     {
         $orden = OrdenCompra::find($request->id);

@@ -74,7 +74,9 @@ Route::middleware(['auth'])->group(function () {
     // ORDENES DE COMPRA
     // =========================
     Route::resource('ordencompras', OrdenCompraController::class);
-    Route::get('cambioestadoordencompra', [OrdenCompraController::class, 'cambioestado'])->name('cambioestadoordencompra');
+    
+    // CAMBIO DE ESTADO (POST para el switch)
+    Route::post('cambioestadoordencompra', [OrdenCompraController::class, 'cambioestado'])->name('ordencompras.cambioestado');
     
     // PDF y EXCEL
     Route::get('ordencompras/pdf/{id}', [OrdenCompraController::class, 'generarPDF'])->name('ordencompras.pdf')->whereNumber('id');
