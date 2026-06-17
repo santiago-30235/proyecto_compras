@@ -64,130 +64,64 @@
                         </div>
                         
                         <div class="card-body">
-                            <!-- SELECTOR DE REGISTROS POR PÁGINA -->
-                            <div class="row mb-3">
-                                <div class="col-md-3">
-                                    <div class="d-flex align-items-center">
-                                        <label class="mr-2 mb-0">Mostrar:</label>
-                                        <select class="form-control form-control-sm" style="width: auto;" onchange="window.location.href=this.value">
-                                            @php
-                                                $perPage = request('per_page', 10);
-                                                $options = [10, 25, 50, 100];
-                                            @endphp
-                                            @foreach($options as $option)
-                                                <option value="{{ request()->fullUrlWithQuery(['per_page' => $option, 'page' => 1]) }}" 
-                                                    {{ $perPage == $option ? 'selected' : '' }}>
-                                                    {{ $option }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        <span class="ml-2">entradas</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-5">
-                                    <!-- BARRA DE BÚSQUEDA -->
-                                    <form method="GET" action="{{ route('ordencompras.index') }}" class="form-inline">
-                                        <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
-                                        <div class="input-group input-group-sm w-100">
-                                            <input type="text" class="form-control" name="search" 
-                                                   placeholder="Buscar por ID, proveedor, fecha..." 
-                                                   value="{{ request('search') }}">
-                                            <div class="input-group-append">
-                                                <button class="btn btn-primary" type="submit">
-                                                    <i class="fas fa-search"></i>
-                                                </button>
-                                                @if(request('search'))
-                                                    <a href="{{ route('ordencompras.index', ['per_page' => request('per_page', 10)]) }}" 
-                                                       class="btn btn-danger">
-                                                        <i class="fas fa-times"></i>
-                                                    </a>
-                                                @endif
+                            <!-- TABLA CON DATATABLES (IGUAL QUE PROVEEDORES) -->
+                            <table id="example1" class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Proveedor</th>
+                                        <th>Fecha</th>
+                                        <th>Total</th>
+                                        <th>Tipo Pago</th>
+                                        <th>Saldo</th>
+                                        <th>Estado</th>
+                                        <th>Registrado por</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($ordencompras as $orden)
+                                    <tr>
+                                        <td>#{{ $orden->id }}</td>
+                                        <td>{{ $orden->proveedor->nombre ?? 'N/A' }}</td>
+                                        <td>{{ date('d/m/Y H:i', strtotime($orden->fecha)) }}</td>
+                                        <td>${{ number_format($orden->total, 2) }}</td>
+                                        <td>{{ ucfirst($orden->tipopago) }}</td>
+                                        <td>
+                                            @if($orden->saldopendiente > 0)
+                                                <span class="badge badge-danger">${{ number_format($orden->saldopendiente, 2) }}</span>
+                                            @else
+                                                <span class="badge badge-success">Pagado</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <input data-type="ordencompra" data-id="{{ $orden->id }}" class="toggle-class" type="checkbox" data-toggle="toggle" data-onstyle="success" data-offstyle="danger" data-on="Activo" data-off="Inactivo" {{ $orden->estado == '1' ? 'checked' : '' }}>
+                                        </td>
+                                        <td>{{ $orden->registradopor }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ route('ordencompras.show', $orden->id) }}" class="btn btn-info" title="Ver">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ route('ordencompras.pdf', $orden->id) }}" class="btn btn-danger" title="Generar PDF" target="_blank">
+                                                    <i class="fas fa-file-pdf"></i>
+                                                </a>
+                                                <a href="{{ route('ordencompras.edit', $orden->id) }}" class="btn btn-primary" title="Editar">
+                                                    <i class="fas fa-pencil-alt"></i>
+                                                </a>
+                                                <form class="d-inline delete-form" action="{{ route('ordencompras.destroy', $orden->id) }}" method="POST" onsubmit="return confirmarEliminacion(event, this, 'Orden #{{ $orden->id }}')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-danger" title="Eliminar">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </form>
                                             </div>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-
-                            <!-- TABLA -->
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Proveedor</th>
-                                            <th>Fecha</th>
-                                            <th>Total</th>
-                                            <th>Tipo Pago</th>
-                                            <th>Saldo</th>
-                                            <th>Estado</th>
-                                            <th>Registrado por</th>
-                                            <th>Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse($ordencompras as $orden)
-                                        <tr>
-                                            <td>#{{ $orden->id }}</td>
-                                            <td>{{ $orden->proveedor->nombre ?? 'N/A' }}</td>
-                                            <td>{{ date('d/m/Y H:i', strtotime($orden->fecha)) }}</td>
-                                            <td>${{ number_format($orden->total, 2) }}</td>
-                                            <td>{{ ucfirst($orden->tipopago) }}</td>
-                                            <td>
-                                                @if($orden->saldopendiente > 0)
-                                                    <span class="badge badge-danger">${{ number_format($orden->saldopendiente, 2) }}</span>
-                                                @else
-                                                    <span class="badge badge-success">Pagado</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <input data-type="ordencompra" data-id="{{ $orden->id }}" class="toggle-class" type="checkbox" data-toggle="toggle" data-onstyle="success" data-offstyle="danger" data-on="Activo" data-off="Inactivo" {{ $orden->estado == '1' ? 'checked' : '' }}>
-                                            </td>
-                                            <td>{{ $orden->registradopor }}</td>
-                                            <td>
-                                                <div class="btn-group btn-group-sm">
-                                                    <a href="{{ route('ordencompras.show', $orden->id) }}" class="btn btn-info" title="Ver">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
-                                                    <a href="{{ route('ordencompras.pdf', $orden->id) }}" class="btn btn-danger" title="Generar PDF" target="_blank">
-                                                        <i class="fas fa-file-pdf"></i>
-                                                    </a>
-                                                    <a href="{{ route('ordencompras.edit', $orden->id) }}" class="btn btn-primary" title="Editar">
-                                                        <i class="fas fa-pencil-alt"></i>
-                                                    </a>
-                                                    <form class="d-inline delete-form" action="{{ route('ordencompras.destroy', $orden->id) }}" method="POST" onsubmit="return confirmarEliminacion(event, this, 'Orden #{{ $orden->id }}')">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="btn btn-danger" title="Eliminar">
-                                                            <i class="fas fa-trash-alt"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        @empty
-                                        <tr>
-                                            <td colspan="9" class="text-center">No hay órdenes de compra registradas</td>
-                                        </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <!-- PAGINACIÓN Y CONTADOR -->
-                            <div class="row mt-3">
-                                <div class="col-md-6">
-                                    <strong>
-                                        Mostrando {{ $ordencompras->firstItem() ?? 0 }} a {{ $ordencompras->lastItem() ?? 0 }} 
-                                        de {{ $ordencompras->total() }} entradas
-                                    </strong>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="float-right">
-                                        {{ $ordencompras->links('pagination::bootstrap-4') }}
-                                    </div>
-                                </div>
-                            </div>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -220,6 +154,29 @@
 
 @section('js')
 <script>
+    $(function() {
+        $("#example1").DataTable({
+            responsive: true,
+            lengthChange: true,
+            autoWidth: false,
+            pageLength: 10,
+            language: {
+                lengthMenu: "Mostrar _MENU_ registros",
+                zeroRecords: "No se encontraron registros",
+                info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+                infoEmpty: "No hay registros disponibles",
+                infoFiltered: "(filtrado de _MAX_ registros)",
+                search: "Buscar:",
+                paginate: {
+                    first: "Primero",
+                    last: "Último",
+                    next: "Siguiente",
+                    previous: "Anterior"
+                }
+            }
+        });
+    });
+
     let formularioAEliminar = null;
     const modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
 
