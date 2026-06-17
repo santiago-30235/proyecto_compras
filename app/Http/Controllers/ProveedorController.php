@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DetalleCompra;
 use App\Models\Proveedor;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
@@ -98,91 +99,40 @@ class ProveedorController extends Controller
     }
 
     public function destroy($id)
-{
-    try {
+    {
         $proveedor = Proveedor::find($id);
 
         if (!$proveedor) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Proveedor no encontrado.'
-            ], 404);
+            session()->flash('error', 'Proveedor no encontrado.');
+            return redirect()->route('proveedores.index');
         }
 
-        // Verificar todas las dependencias
-        $errores = [];
+        $ordenesCompras = $proveedor->ordenCompras()->count();
+        $ordenCompraIds = $proveedor->ordenCompras()->pluck('id');
+        $productosAsociados = 0;
 
-        // 1. Verificar órdenes de compra
-        if ($proveedor->ordenCompras()->exists()) {
-            $count = $proveedor->ordenCompras()->count();
-            $errores[] = "{$count} órdenes de compra asociadas";
+        if ($ordenCompraIds->isNotEmpty()) {
+            $productosAsociados = DetalleCompra::whereIn('ordencompra_id', $ordenCompraIds)
+                ->distinct()
+                ->count('producto_id');
         }
 
-        // 2. Verificar productos asociados
-        if ($proveedor->productos()->exists()) {
-            $count = $proveedor->productos()->count();
-            $errores[] = "{$count} productos asociados";
+        if ($ordenesCompras > 0 || $productosAsociados > 0) {
+            session()->flash('error', 'No se puede eliminar este proveedor porque tiene ' . $ordenesCompras . ' órdenes de compra asociadas y ' . $productosAsociados . ' productos asociados.');
+            return redirect()->route('proveedores.index');
         }
 
-        // 3. Verificar facturas (si tienes relación)
-        if (method_exists($proveedor, 'facturas') && $proveedor->facturas()->exists()) {
-            $count = $proveedor->facturas()->count();
-            $errores[] = "{$count} facturas asociadas";
-        }
-
-        // 4. Verificar contratos (si tienes relación)
-        if (method_exists($proveedor, 'contratos') && $proveedor->contratos()->exists()) {
-            $count = $proveedor->contratos()->count();
-            $errores[] = "{$count} contratos asociados";
-        }
-
-        // 5. Verificar compras (si tienes relación)
-        if (method_exists($proveedor, 'compras') && $proveedor->compras()->exists()) {
-            $count = $proveedor->compras()->count();
-            $errores[] = "{$count} compras asociadas";
-        }
-
-        // Si hay errores, no se puede eliminar
-        if (!empty($errores)) {
-            $mensaje = 'No se puede eliminar este proveedor porque tiene: ' . implode(', ', $errores) . '.';
-            
-            return response()->json([
-                'success' => false,
-                'message' => $mensaje,
-                'detalles' => $errores
-            ], 400);
-        }
-
-        // Si no tiene dependencias, eliminar
-        DB::beginTransaction();
         try {
             $proveedor->delete();
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Proveedor eliminado correctamente.'
-            ], 200);
-
+            session()->flash('success', 'Proveedor eliminado correctamente.');
+            return redirect()->route('proveedores.index');
         } catch (Exception $e) {
-            DB::rollBack();
             Log::error('Error al eliminar proveedor: ' . $e->getMessage());
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Ocurrió un error al intentar eliminar el proveedor.'
-            ], 500);
+            session()->flash('error', 'Ocurrió un error al intentar eliminar el proveedor.');
+            return redirect()->route('proveedores.index');
         }
-
-    } catch (Exception $e) {
-        Log::error('Error en destroy proveedor: ' . $e->getMessage());
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'Ocurrió un error al procesar la solicitud.'
-        ], 500);
     }
-}
+
     public function cambioestado(Request $request)
     {
         $proveedor = Proveedor::find($request->id);

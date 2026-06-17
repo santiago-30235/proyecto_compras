@@ -137,14 +137,15 @@ class ProductoController extends Controller
         $producto = Producto::find($id);
 
         if (!$producto) {
-            return redirect()->route('productos.index')
-                ->with('error', 'Producto no encontrado.');
+            session()->flash('error', 'Producto no encontrado.');
+            return redirect()->route('productos.index');
         }
 
-        // Verificar si tiene detalles de compra asociados
-        if ($producto->detallescompras()->exists()) {
-            return redirect()->route('productos.index')
-                ->with('error', 'No se puede eliminar este producto porque está asociado a una orden de compra.');
+        $detallesOrdenCompra = $producto->detallesCompras()->count();
+
+        if ($detallesOrdenCompra > 0) {
+            session()->flash('error', 'No se puede eliminar este producto porque tiene ' . $detallesOrdenCompra . ' detalles de órdenes de compra asociados.');
+            return redirect()->route('productos.index');
         }
 
         try {
@@ -155,13 +156,13 @@ class ProductoController extends Controller
 
             $producto->delete();
 
-            return redirect()->route('productos.index')
-                ->with('success', 'Producto eliminado correctamente.');
+            session()->flash('success', 'Producto eliminado correctamente.');
+            return redirect()->route('productos.index');
 
         } catch (Exception $e) {
             Log::error('Error al eliminar producto: ' . $e->getMessage());
-            return redirect()->route('productos.index')
-                ->with('error', 'Ocurrió un error al intentar eliminar el producto.');
+            session()->flash('error', 'Ocurrió un error al intentar eliminar el producto.');
+            return redirect()->route('productos.index');
         }
     }
 

@@ -78,7 +78,7 @@
                                                 <a href="{{ route('pagos.edit', $pago->id) }}" class="btn btn-primary" title="Editar">
                                                     <i class="fas fa-pencil-alt"></i>
                                                 </a>
-                                                <form class="d-inline delete-form" action="{{ route('pagos.destroy', $pago->id) }}" method="POST">
+                                                <form class="d-inline delete-form" action="{{ route('pagos.destroy', $pago->id) }}" method="POST" onsubmit="return confirmarEliminacion(event, this, 'Pago #{{ $pago->id }}')">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-danger" title="Eliminar">
@@ -98,6 +98,26 @@
             </div>
         </div>
     </section>
+</div>
+
+<div class="modal fade" id="modalConfirmarEliminar" tabindex="-1" aria-labelledby="modalConfirmarEliminarLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalConfirmarEliminarLabel">¿Está seguro?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Esta acción no se puede deshacer.</p>
+                <p class="text-muted" id="nombreElementoAEliminar"></p>
+                <div id="mensajeErrorEliminar" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarEliminar">Sí, eliminar</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 @endsection
@@ -125,6 +145,34 @@
                 }
             }
         });
+    });
+
+    let formularioAEliminar = null;
+    const modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
+
+    function confirmarEliminacion(event, form, nombre) {
+        event.preventDefault();
+        formularioAEliminar = form;
+        document.getElementById('nombreElementoAEliminar').innerHTML = 'Elemento: <strong>' + nombre + '</strong>';
+        document.getElementById('mensajeErrorEliminar').classList.add('d-none');
+        modal.show();
+        return false;
+    }
+
+    document.getElementById('btnConfirmarEliminar').addEventListener('click', function() {
+        if (formularioAEliminar) {
+            this.disabled = true;
+            this.innerHTML = 'Eliminando...';
+            formularioAEliminar.submit();
+        }
+    });
+
+    document.getElementById('modalConfirmarEliminar').addEventListener('hidden.bs.modal', function() {
+        const btn = document.getElementById('btnConfirmarEliminar');
+        btn.disabled = false;
+        btn.innerHTML = 'Sí, eliminar';
+        formularioAEliminar = null;
+        document.getElementById('mensajeErrorEliminar').classList.add('d-none');
     });
 </script>
 @endsection

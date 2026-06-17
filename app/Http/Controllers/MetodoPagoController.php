@@ -90,25 +90,26 @@ class MetodoPagoController extends Controller
         $metodopago = MetodoPago::find($id);
 
         if (!$metodopago) {
-            return redirect()->route('metodopagos.index')
-                ->with('error', 'Método de pago no encontrado.');
+            session()->flash('error', 'Método de pago no encontrado.');
+            return redirect()->route('metodopagos.index');
         }
 
-        // Verificar si tiene pagos asociados
-        if ($metodopago->pagos()->exists()) {
-            return redirect()->route('metodopagos.index')
-                ->with('error', 'No se puede eliminar este método de pago porque está asociado a uno o más pagos.');
+        $comprasAsociadas = $metodopago->pagos()->count();
+
+        if ($comprasAsociadas > 0) {
+            session()->flash('error', 'No se puede eliminar este método de pago porque tiene ' . $comprasAsociadas . ' compras asociadas.');
+            return redirect()->route('metodopagos.index');
         }
 
         try {
             $metodopago->delete();
-            return redirect()->route('metodopagos.index')
-                ->with('success', 'Método de pago eliminado correctamente.');
+            session()->flash('success', 'Método de pago eliminado correctamente.');
+            return redirect()->route('metodopagos.index');
 
         } catch (Exception $e) {
             Log::error('Error al eliminar método de pago: ' . $e->getMessage());
-            return redirect()->route('metodopagos.index')
-                ->with('error', 'Ocurrió un error al intentar eliminar el método de pago.');
+            session()->flash('error', 'Ocurrió un error al intentar eliminar el método de pago.');
+            return redirect()->route('metodopagos.index');
         }
     }
 
