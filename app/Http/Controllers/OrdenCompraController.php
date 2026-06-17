@@ -37,8 +37,8 @@ class OrdenCompraController extends Controller
     {
         $proveedores = Proveedor::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
-        $metodospago = MetodoPago::where('estado', '1')->get();
-        return view('ordencompras.create', compact('proveedores', 'productos', 'metodospago'));
+        $metodosPago = MetodoPago::where('estado', '1')->get();
+        return view('ordencompras.create', compact('proveedores', 'productos', 'metodosPago'));
     }
 
     public function store(Request $request)
@@ -152,8 +152,8 @@ class OrdenCompraController extends Controller
         $orden = OrdenCompra::findOrFail($id);
         $proveedores = Proveedor::where('estado', '1')->get();
         $productos = Producto::where('estado', '1')->get();
-        $metodospago = MetodoPago::where('estado', '1')->get();
-        return view('ordencompras.edit', compact('orden', 'proveedores', 'productos', 'metodospago'));
+        $metodosPago = MetodoPago::where('estado', '1')->get();
+        return view('ordencompras.edit', compact('orden', 'proveedores', 'productos', 'metodosPago'));
     }
 
     public function update(Request $request, $id)
